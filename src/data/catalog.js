@@ -1,0 +1,50 @@
+// =====================================================
+// CATÁLOGO GIMIMO
+// Para adicionar uma nova banda: copie um bloco abaixo
+// Para adicionar pins: copie um objeto dentro de "pins"
+// As imagens ficam na pasta /public/images/NOME-DA-BANDA/
+// =====================================================
+
+export const WHATSAPP_NUMBER = '5511982204504' // Troque pelo número da loja com DDI+DDD
+export const EMAIL_LOJA = 'gimimoandco@gmail.comr'  // Troque pelo e-mail da loja
+
+export const bands = [
+  {
+    id: 'twenty-one-pilots',
+    name: 'Twenty One Pilots',
+    emoji: '🌿',
+    color: '#fbbf24',         // cor de destaque do card
+    pins: [
+      { id: 'top-01', name: '21 PILOTS 01', image: '/images/twenty-one-pilots/01.jpg' },
+      { id: 'top-02', name: '21 PILOTS 02', image: '/images/twenty-one-pilots/02.jpg' },
+      { id: 'top-03', name: '21 PILOTS 03', image: '/images/twenty-one-pilots/03.jpg' },
+      { id: 'top-04', name: '21 PILOTS 04', image: '/images/twenty-one-pilots/04.jpg' },
+      { id: 'top-05', name: '21 PILOTS 05', image: '/images/twenty-one-pilots/05.jpg' },
+      { id: 'top-06', name: '21 PILOTS 06', image: '/images/twenty-one-pilots/06.jpg' },
+      { id: 'top-07', name: '21 PILOTS 07', image: '/images/twenty-one-pilots/07.jpg' },
+      { id: 'top-08', name: '21 PILOTS 08', image: '/images/twenty-one-pilots/08.jpg' },
+      { id: 'top-09', name: '21 PILOTS 09', image: '/images/twenty-one-pilots/09.jpg' },
+      { id: 'top-10', name: '21 PILOTS 10', image: '/images/twenty-one-pilots/10.jpg' },
+      { id: 'top-11', name: '21 PILOTS 11', image: '/images/twenty-one-pilots/11.jpg' },
+      { id: 'top-12', name: '21 PILOTS 12', image: '/images/twenty-one-pilots/12.jpg' },
+      { id: 'top-13', name: '21 PILOTS 13', image: '/images/twenty-one-pilots/13.jpg' },
+      { id: 'top-14', name: '21 PILOTS 14', image: '/images/twenty-one-pilots/14.jpg' },
+      { id: 'top-15', name: '21 PILOTS 15', image: '/images/twenty-one-pilots/15.jpg' },
+      { id: 'top-16', name: '21 PILOTS 16', image: '/images/twenty-one-pilots/16.jpg' },
+      { id: 'top-17', name: '21 PILOTS 17', image: '/images/twenty-one-pilots/17.jpg' },
+      { id: 'top-18', name: '21 PILOTS 18', image: '/images/twenty-one-pilots/18.jpg' },
+    ]
+  },
+
+  // Exemplo de outra banda — duplique este bloco para adicionar mais
+  {
+    id: 'exemplo-banda',
+    name: 'Nome da Banda',
+    emoji: '⭐',
+    color: '#818cf8',
+    pins: [
+      { id: 'ex-01', name: 'BANDA 01', image: '/images/exemplo-banda/01.jpg' },
+      { id: 'ex-02', name: 'BANDA 02', image: '/images/exemplo-banda/02.jpg' },
+    ]
+  },
+]
