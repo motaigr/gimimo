@@ -37,14 +37,41 @@ export const bands = [
   },
 
   // Exemplo de outra banda — duplique este bloco para adicionar mais
+  //{
+    //id: 'exemplo-banda',
+    //name: 'Nome da Banda',
+    //emoji: '⭐',
+    //color: '#818cf8',
+    //pins: [
+      //{ id: 'ex-01', name: 'BANDA 01', image: '/images/exemplo-banda/01.jpg' },
+      //{ id: 'ex-02', name: 'BANDA 02', image: '/images/exemplo-banda/02.jpg' },
+    //]
+  //},
+
   {
-    id: 'exemplo-banda',
-    name: 'Nome da Banda',
+    id: 'Franz-Ferdinand',
+    name: 'Franz Ferdinand',
     emoji: '⭐',
     color: '#818cf8',
     pins: [
-      { id: 'ex-01', name: 'BANDA 01', image: '/images/exemplo-banda/01.jpg' },
-      { id: 'ex-02', name: 'BANDA 02', image: '/images/exemplo-banda/02.jpg' },
+      { id: 'FF-01', name: 'Franz Ferdinand 01', image: '/images/franz-ferdinand/01.jpg' },
+      { id: 'FF-02', name: 'Franz Ferdinand 02', image: '/images/franz-ferdinand/02.jpg' },
+    ]
+  },
+
+  {
+    id: 'Greta-Van-Fleet',
+    name: 'Greta Van Fleet',
+    emoji: '⭐',
+    color: '#818cf8',
+    pins: [
+      { id: 'GVF-01', name: 'Greta Van Fleet 01', image: '/images/greta-van-fleet/01.jpg' },
+      { id: 'GVF-02', name: 'Greta Van Fleet 02', image: '/images/greta-van-fleet/02.jpg' },
+      { id: 'GVF-03', name: 'Greta Van Fleet 03', image: '/images/greta-van-fleet/03.jpg' },
+      { id: 'GVF-04', name: 'Greta Van Fleet 04', image: '/images/greta-van-fleet/04.jpg' },
+      { id: 'GVF-05', name: 'Greta Van Fleet 05', image: '/images/greta-van-fleet/05.jpg' },
+      { id: 'GVF-06', name: 'Greta Van Fleet 06', image: '/images/greta-van-fleet/06.jpg' },
+      { id: 'GVF-07', name: 'Greta Van Fleet 07', image: '/images/greta-van-fleet/07.jpg' },
     ]
   },
 ]
