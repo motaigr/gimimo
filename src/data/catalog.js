@@ -74,4 +74,20 @@ export const bands = [
       { id: 'GVF-07', name: 'Greta Van Fleet 07', image: '/images/greta-van-fleet/07.jpg' },
     ]
   },
+
+  {
+    id: 'AC DC',
+    name: 'AC-DC',
+    emoji: '⭐',
+    color: '#818cf8',
+    pins: [
+      { id: 'ACDC-01', name: 'AC-DC 01', image: '/images/ac-dc/01.jpg' },
+      { id: 'ACDC-02', name: 'AC-DC 02', image: '/images/ac-dc/02.jpg' },
+      { id: 'ACDC-03', name: 'AC-DC 03', image: '/images/ac-dc/03.jpg' },
+      { id: 'ACDC-04', name: 'AC-DC 04', image: '/images/ac-dc/04.jpg' },
+      { id: 'ACDC-05', name: 'AC-DC 05', image: '/images/ac-dc/05.jpg' },
+      { id: 'ACDC-06', name: 'AC-DC 06', image: '/images/ac-dc/06.jpg' },
+      { id: 'ACDC-07', name: 'AC-DC 07', image: '/images/ac-dc/07.jpg' },
+    ]
+  },
 ]
