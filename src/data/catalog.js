@@ -9,10 +9,23 @@ export const WHATSAPP_NUMBER = '5511982204504' // Troque pelo número da loja co
 export const EMAIL_LOJA = 'gimimoandco@gmail.comr'  // Troque pelo e-mail da loja
 
 export const bands = [
+    // Exemplo de outra banda — duplique este bloco para adicionar mais
+  //{
+    //id: 'exemplo-banda',
+    //name: 'Nome da Banda',
+    //emoji: '⭐',
+    //color: '#818cf8',
+    //pins: [
+      //{ id: 'ex-01', name: 'BANDA 01', image: '/images/exemplo-banda/01.jpg' },
+      //{ id: 'ex-02', name: 'BANDA 02', image: '/images/exemplo-banda/02.jpg' },
+    //]
+  //},
+
+
+
   {
     id: 'twenty-one-pilots',
     name: 'Twenty One Pilots',
-    emoji: '🌿',
     color: '#fbbf24',         // cor de destaque do card
     pins: [
       { id: 'top-01', name: '21 PILOTS 01', image: '/images/twenty-one-pilots/01.jpg' },
@@ -36,22 +49,9 @@ export const bands = [
     ]
   },
 
-  // Exemplo de outra banda — duplique este bloco para adicionar mais
-  //{
-    //id: 'exemplo-banda',
-    //name: 'Nome da Banda',
-    //emoji: '⭐',
-    //color: '#818cf8',
-    //pins: [
-      //{ id: 'ex-01', name: 'BANDA 01', image: '/images/exemplo-banda/01.jpg' },
-      //{ id: 'ex-02', name: 'BANDA 02', image: '/images/exemplo-banda/02.jpg' },
-    //]
-  //},
-
   {
     id: 'Franz-Ferdinand',
     name: 'Franz Ferdinand',
-    emoji: '⭐',
     color: '#818cf8',
     pins: [
       { id: 'FF-01', name: 'Franz Ferdinand 01', image: '/images/franz-ferdinand/01.jpg' },
@@ -62,7 +62,6 @@ export const bands = [
   {
     id: 'Greta-Van-Fleet',
     name: 'Greta Van Fleet',
-    emoji: '⭐',
     color: '#818cf8',
     pins: [
       { id: 'GVF-01', name: 'Greta Van Fleet 01', image: '/images/greta-van-fleet/01.jpg' },
@@ -78,7 +77,6 @@ export const bands = [
   {
     id: 'AC DC',
     name: 'AC-DC',
-    emoji: '⭐',
     color: '#818cf8',
     pins: [
       { id: 'ACDC-01', name: 'AC-DC 01', image: '/images/ac-dc/01.jpg' },
@@ -88,6 +86,16 @@ export const bands = [
       { id: 'ACDC-05', name: 'AC-DC 05', image: '/images/ac-dc/05.jpg' },
       { id: 'ACDC-06', name: 'AC-DC 06', image: '/images/ac-dc/06.jpg' },
       { id: 'ACDC-07', name: 'AC-DC 07', image: '/images/ac-dc/07.jpg' },
+      { id: 'ACDC-08', name: 'AC-DC 08', image: '/images/ac-dc/08.jpg' },
+      { id: 'ACDC-09', name: 'AC-DC 09', image: '/images/ac-dc/09.jpg' },
+      { id: 'ACDC-10', name: 'AC-DC 10', image: '/images/ac-dc/10.jpg' },
+      { id: 'ACDC-11', name: 'AC-DC 11', image: '/images/ac-dc/11.jpg' },
+      { id: 'ACDC-12', name: 'AC-DC 12', image: '/images/ac-dc/12.jpg' },
+      { id: 'ACDC-13', name: 'AC-DC 13', image: '/images/ac-dc/13.jpg' },
+      { id: 'ACDC-14', name: 'AC-DC 14', image: '/images/ac-dc/14.jpg' },
+      { id: 'ACDC-15', name: 'AC-DC 15', image: '/images/ac-dc/15.jpg' },
+      { id: 'ACDC-16', name: 'AC-DC 16', image: '/images/ac-dc/16.jpg' },
+      { id: 'ACDC-17', name: 'AC-DC 17', image: '/images/ac-dc/17.jpg' },
     ]
   },
 ]
