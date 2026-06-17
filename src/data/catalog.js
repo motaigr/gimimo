@@ -98,4 +98,23 @@ export const bands = [
       { id: 'ACDC-17', name: 'AC-DC 17', image: '/images/ac-dc/17.jpg' },
     ]
   },
-]
+
+  {
+    id: 'Acidez',
+    name: 'Acidez',
+    color: '#818cf8',
+    pins: [
+      { id: 'ACD-01', name: 'Acidez 01', image: '/images/acidez/01.jpg' },
+      { id: 'ACD-02', name: 'Acidez 02', image: '/images/acidez/02.jpg' },
+    ]
+  },
+
+  {
+    id: 'Addicts',
+    name: 'Addicts',
+    color: '#818cf8',
+    pins: [
+      { id: 'ADD-01', name: 'Addicts 01', image: '/images/addicts/01.jpg' },
+      { id: 'ADD-02', name: 'Addicts 02', image: '/images/addicts/02.jpg' },
+    ]
+  },
