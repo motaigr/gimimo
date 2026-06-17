@@ -106,6 +106,8 @@ export const bands = [
     pins: [
       { id: 'ACD-01', name: 'Acidez 01', image: '/images/acidez/01.jpg' },
       { id: 'ACD-02', name: 'Acidez 02', image: '/images/acidez/02.jpg' },
+      { id: 'ACD-03', name: 'Acidez 03', image: '/images/acidez/03.jpg' },
+      { id: 'ACD-04', name: 'Acidez 04', image: '/images/acidez/04.jpg' },
     ]
   },
 
@@ -116,5 +118,8 @@ export const bands = [
     pins: [
       { id: 'ADD-01', name: 'Addicts 01', image: '/images/addicts/01.jpg' },
       { id: 'ADD-02', name: 'Addicts 02', image: '/images/addicts/02.jpg' },
+      { id: 'ADD-03', name: 'Addicts 03', image: '/images/addicts/03.jpg' },
+      { id: 'ADD-04', name: 'Addicts 04', image: '/images/addicts/04.jpg' },
     ]
   },
+]
