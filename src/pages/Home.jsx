@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <div className="home">
       <div className="home-hero">
-        <h1 className="home-title">pins & buttons</h1>
+        <h1 className="home-title">Bottons</h1>
         <p className="home-sub">escolha uma banda ou tema</p>
       </div>
 

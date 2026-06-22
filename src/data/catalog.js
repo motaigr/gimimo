@@ -165,4 +165,47 @@ export const bands = [
       { id: 'AIC-08', name: 'Alice In Chains 08', image: '/images/alice-in-chains/08.jpg' },
     ]
   },
+
+  {
+    id: 'Amelie',
+    name: 'Amelie',
+    color: '#818cf8',
+    pins: [
+      { id: 'AME-01', name: 'Amelie 01', image: '/images/amelie/01.jpg' },
+      { id: 'AME-02', name: 'Amelie 02', image: '/images/amelie/02.jpg' },
+      { id: 'AME-03', name: 'Amelie 03', image: '/images/amelie/03.jpg' },
+      { id: 'AME-04', name: 'Amelie 04', image: '/images/amelie/04.jpg' },
+    ]
+  },
+
+  {
+    id: 'Amywinehouse',
+    name: 'Amy Winehouse',
+    color: '#818cf8',
+    pins: [
+      { id: 'AWH-01', name: 'Amy Winehouse 01', image: '/images/amy-winehouse/01.jpg' },
+      { id: 'AWH-02', name: 'Amy Winehouse 02', image: '/images/amy-winehouse/02.jpg' },
+      { id: 'AWH-03', name: 'Amy Winehouse 03', image: '/images/amy-winehouse/03.jpg' },
+      { id: 'AWH-04', name: 'Amy Winehouse 04', image: '/images/amy-winehouse/04.jpg' },
+      { id: 'AWH-05', name: 'Amy Winehouse 05', image: '/images/amy-winehouse/05.jpg' },
+      { id: 'AWH-06', name: 'Amy Winehouse 06', image: '/images/amy-winehouse/06.jpg' },
+      { id: 'AWH-07', name: 'Amy Winehouse 07', image: '/images/amy-winehouse/07.jpg' },
+      { id: 'AWH-08', name: 'Amy Winehouse 08', image: '/images/amy-winehouse/08.jpg' },
+      { id: 'AWH-09', name: 'Amy Winehouse 09', image: '/images/amy-winehouse/09.jpg' },
+      { id: 'AWH-10', name: 'Amy Winehouse 10', image: '/images/amy-winehouse/10.jpg' },
+    ]
+  },
+
+  {
+    id: 'Anti social social club',
+    name: 'Anti Social Social Club',
+    color: '#818cf8',
+    pins: [
+      { id: 'ASS-01', name: 'Anti Social Social Club 01', image: '/images/anti-social-social-club/01.jpg' },
+      { id: 'ASS-02', name: 'Anti Social Social Club 02', image: '/images/anti-social-social-club/02.jpg' },
+      { id: 'ASS-03', name: 'Anti Social Social Club 03', image: '/images/anti-social-social-club/03.jpg' },
+      { id: 'ASS-04', name: 'Anti Social Social Club 04', image: '/images/anti-social-social-club/04.jpg' },
+      { id: 'ASS-04', name: 'Anti Social Social Club 05', image: '/images/anti-social-social-club/05.jpg' },
+    ]
+  },
 ]
