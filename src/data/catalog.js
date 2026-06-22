@@ -120,6 +120,49 @@ export const bands = [
       { id: 'ADD-02', name: 'Addicts 02', image: '/images/addicts/02.jpg' },
       { id: 'ADD-03', name: 'Addicts 03', image: '/images/addicts/03.jpg' },
       { id: 'ADD-04', name: 'Addicts 04', image: '/images/addicts/04.jpg' },
+      { id: 'ADD-05', name: 'Addicts 05', image: '/images/addicts/05.jpg' },
+      { id: 'ADD-06', name: 'Addicts 06', image: '/images/addicts/06.jpg' },
+      { id: 'ADD-07', name: 'Addicts 07', image: '/images/addicts/07.jpg' },
+      { id: 'ADD-08', name: 'Addicts 08', image: '/images/addicts/08.jpg' },
+      { id: 'ADD-09', name: 'Addicts 09', image: '/images/addicts/09.jpg' },
+      { id: 'ADD-10', name: 'Addicts 10', image: '/images/addicts/10.jpg' },
+    ]
+  },
+
+  {
+    id: 'Aerosmith',
+    name: 'Aerosmith',
+    color: '#818cf8',
+    pins: [
+      { id: 'AER-01', name: 'Aerosmith 01', image: '/images/aerosmith/01.jpg' },
+      { id: 'AER-02', name: 'Aerosmith 02', image: '/images/aerosmith/02.jpg' },
+      { id: 'AER-03', name: 'Aerosmith 03', image: '/images/aerosmith/03.jpg' },
+      { id: 'AER-04', name: 'Aerosmith 04', image: '/images/aerosmith/04.jpg' },
+      { id: 'AER-05', name: 'Aerosmith 05', image: '/images/aerosmith/05.jpg' },
+      { id: 'AER-06', name: 'Aerosmith 06', image: '/images/aerosmith/06.jpg' },
+      { id: 'AER-07', name: 'Aerosmith 07', image: '/images/aerosmith/07.jpg' },
+      { id: 'AER-08', name: 'Aerosmith 08', image: '/images/aerosmith/08.jpg' },
+      { id: 'AER-09', name: 'Aerosmith 09', image: '/images/aerosmith/09.jpg' },
+      { id: 'AER-10', name: 'Aerosmith 10', image: '/images/aerosmith/10.jpg' },
+      { id: 'AER-11', name: 'Aerosmith 11', image: '/images/aerosmith/11.jpg' },
+      { id: 'AER-12', name: 'Aerosmith 12', image: '/images/aerosmith/12.jpg' },
+      { id: 'AER-13', name: 'Aerosmith 13', image: '/images/aerosmith/13.jpg' },
+    ]
+  },
+
+  {
+    id: 'Alice-In-Chains',
+    name: 'Alice In Chains',
+    color: '#818cf8',
+    pins: [
+      { id: 'AIC-01', name: 'Alice In Chains 01', image: '/images/alice-in-chains/01.jpg' },
+      { id: 'AIC-02', name: 'Alice In Chains 02', image: '/images/alice-in-chains/02.jpg' },
+      { id: 'AIC-03', name: 'Alice In Chains 03', image: '/images/alice-in-chains/03.jpg' },
+      { id: 'AIC-04', name: 'Alice In Chains 04', image: '/images/alice-in-chains/04.jpg' },
+      { id: 'AIC-05', name: 'Alice In Chains 05', image: '/images/alice-in-chains/05.jpg' },
+      { id: 'AIC-06', name: 'Alice In Chains 06', image: '/images/alice-in-chains/06.jpg' },
+      { id: 'AIC-07', name: 'Alice In Chains 07', image: '/images/alice-in-chains/07.jpg' },
+      { id: 'AIC-08', name: 'Alice In Chains 08', image: '/images/alice-in-chains/08.jpg' },
     ]
   },
 ]
