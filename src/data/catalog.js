@@ -205,7 +205,33 @@ export const bands = [
       { id: 'ASS-02', name: 'Anti Social Social Club 02', image: '/images/anti-social-social-club/02.jpg' },
       { id: 'ASS-03', name: 'Anti Social Social Club 03', image: '/images/anti-social-social-club/03.jpg' },
       { id: 'ASS-04', name: 'Anti Social Social Club 04', image: '/images/anti-social-social-club/04.jpg' },
-      { id: 'ASS-04', name: 'Anti Social Social Club 05', image: '/images/anti-social-social-club/05.jpg' },
+      { id: 'ASS-05', name: 'Anti Social Social Club 05', image: '/images/anti-social-social-club/05.jpg' },
+    ]
+  },
+
+  {
+    id: 'Arctic Monkey',
+    name: 'Arctic Monkey',
+    color: '#818cf8',
+    pins: [
+      { id: 'ARC-01', name: 'Arctic Monkey 01', image: '/images/arctic-monkeys/01.jpg' },
+      { id: 'ARC-02', name: 'Arctic Monkey 02', image: '/images/arctic-monkeys/02.jpg' },
+      { id: 'ARC-03', name: 'Arctic Monkey 03', image: '/images/arctic-monkeys/03.jpg' },
+      { id: 'ARC-04', name: 'Arctic Monkey 04', image: '/images/arctic-monkeys/04.jpg' },
+      { id: 'ARC-05', name: 'Arctic Monkey 05', image: '/images/arctic-monkeys/05.jpg' },
+      { id: 'ARC-06', name: 'Arctic Monkey 06', image: '/images/arctic-monkeys/06.jpg' },
+      { id: 'ARC-07', name: 'Arctic Monkey 07', image: '/images/arctic-monkeys/07.jpg' },
+      { id: 'ARC-08', name: 'Arctic Monkey 08', image: '/images/arctic-monkeys/08.jpg' },
+    ]
+  },
+
+  {
+    id: 'Arlequina',
+    name: 'Arlequina',
+    color: '#818cf8',
+    pins: [
+      { id: 'ARL-01', name: 'arlequina 01', image: '/images/arlequina/01.jpg' },
+      { id: 'ARL-02', name: 'arlequina 02', image: '/images/arlequina/02.jpg' },
     ]
   },
 ]
