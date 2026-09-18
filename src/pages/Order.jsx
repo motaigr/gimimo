@@ -1,37 +1,160 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../hooks/useCart'
-import { WHATSAPP_NUMBER, EMAIL_LOJA } from '../data/catalog'
+import { WHATSAPP_NUMBER, EMAIL_LOJA, FORMSPREE_ENDPOINT } from '../data/catalog'
+
+const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect width='120' height='120' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='12'%3Esem foto%3C/text%3E%3C/svg%3E"
+
+function formatPhone(number) {
+  const country = number.slice(0, 2)
+  const ddd = number.slice(2, 4)
+  const rest = number.slice(4)
+  return `+${country} ${ddd} ${rest.slice(0, -4)}-${rest.slice(-4)}`
+}
 
 export default function Order() {
   const { items, totalQty, clearCart, removeItem } = useCart()
   const [nome, setNome] = useState('')
+  const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [semAnexo, setSemAnexo] = useState(false)
+  const [error, setError] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [gerandoPlanilha, setGerandoPlanilha] = useState(false)
+  const [imagensPersonalizadas, setImagensPersonalizadas] = useState([])
   const navigate = useNavigate()
+
+  const hasCustomItem = items.some(i => i.custom)
 
   const buildMessage = () => {
     const nomeCliente = nome.trim() || 'cliente'
     const linhas = items.map(i => `• ${i.name} — ${i.qty} un.`).join('\n')
-    return `Olá! Sou ${nomeCliente} e gostaria de fazer um pedido:\n\n${linhas}\n\nTotal: ${totalQty} unidades`
+    const aviso = hasCustomItem
+      ? '\n\n(o cliente pode enviar imagens de referência do item personalizado em anexo)'
+      : ''
+    return `Olá! Sou ${nomeCliente} e gostaria de fazer um pedido:\n\n${linhas}\n\nTotal: ${totalQty} unidades${aviso}`
   }
 
-  const handleWhatsapp = () => {
+  const handleBaixarPlanilha = async () => {
     if (items.length === 0) return
-    const msg = encodeURIComponent(buildMessage())
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank')
-    setSent(true)
+    setError('')
+    setGerandoPlanilha(true)
+    try {
+      const { downloadOrderExcel } = await import('../utils/orderExcel')
+      await downloadOrderExcel(items, nome.trim())
+    } catch {
+      setError('Não foi possível gerar a planilha. Tente novamente.')
+    } finally {
+      setGerandoPlanilha(false)
+    }
   }
 
-  const handleEmail = () => {
+  const handleEnviarPedido = async (e) => {
+    e.preventDefault()
     if (items.length === 0) return
-    const subject = encodeURIComponent(`Pedido Gimimo — ${nome.trim() || 'cliente'}`)
-    const body = encodeURIComponent(buildMessage())
-    window.open(`mailto:${EMAIL_LOJA}?subject=${subject}&body=${body}`, '_blank')
+    if (!nome.trim() || !email.trim()) {
+      setError('Preencha seu nome e e-mail antes de enviar o pedido.')
+      return
+    }
+    setError('')
+    setEnviando(true)
+
+    try {
+      const { buildOrderExcelBlob, downloadOrderExcel } = await import('../utils/orderExcel')
+      const { blob, filename } = await buildOrderExcelBlob(items, nome.trim())
+
+      // 1) Função serverless (Netlify + Resend): e-mail com anexo de verdade.
+      // Se a função não estiver implantada/configurada ainda, ela não
+      // responde no formato esperado e caímos no próximo método.
+      const { sendOrderViaFunction } = await import('../utils/sendOrder')
+      const enviadoPelaFuncao = await sendOrderViaFunction({
+        nome: nome.trim(),
+        email: email.trim(),
+        message: buildMessage(),
+        planilha: { blob, filename },
+        imagens: imagensPersonalizadas,
+      })
+      if (enviadoPelaFuncao) {
+        setSent(true)
+        return
+      }
+
+      // 2) Formspree: envia pelo menos o texto do pedido automaticamente.
+      // O plano grátis não aceita anexos, então a planilha é baixada à parte.
+      if (FORMSPREE_ENDPOINT) {
+        const formData = new FormData()
+        formData.append('nome', nome.trim())
+        formData.append('_replyto', email.trim())
+        formData.append('message', buildMessage())
+        formData.append('planilha', blob, filename)
+        imagensPersonalizadas.forEach((file, i) => {
+          formData.append(`imagem_personalizada_${i + 1}`, file, file.name)
+        })
+
+        let res = await fetch(FORMSPREE_ENDPOINT, {
+          method: 'POST',
+          body: formData,
+          headers: { Accept: 'application/json' },
+        })
+
+        if (res.ok) {
+          setSent(true)
+          return
+        }
+
+        let errBody = null
+        try { errBody = await res.json() } catch { /* ignora */ }
+        const bloqueadoPorAnexo = errBody?.error === 'File Uploads Not Permitted'
+
+        if (bloqueadoPorAnexo) {
+          const textOnlyForm = new FormData()
+          textOnlyForm.append('nome', nome.trim())
+          textOnlyForm.append('_replyto', email.trim())
+          textOnlyForm.append('message', buildMessage())
+
+          res = await fetch(FORMSPREE_ENDPOINT, {
+            method: 'POST',
+            body: textOnlyForm,
+            headers: { Accept: 'application/json' },
+          })
+
+          if (res.ok) {
+            await downloadOrderExcel(items, nome.trim())
+            setSent(true)
+            setSemAnexo(true)
+            return
+          }
+        }
+
+        setError('Não foi possível enviar o pedido. Tente novamente em instantes.')
+        return
+      }
+
+      // 3) Último recurso: baixa a planilha e abre o e-mail pronto para o
+      // cliente anexar manualmente antes de enviar.
+      await downloadOrderExcel(items, nome.trim())
+      const subject = encodeURIComponent(`Pedido Gimimo — ${nome.trim()}`)
+      const body = encodeURIComponent(
+        `${buildMessage()}\n\n(a planilha do pedido foi baixada agora — anexe-a antes de enviar)`
+      )
+      const win = window.open(`mailto:${EMAIL_LOJA}?subject=${subject}&body=${body}`, '_blank')
+      if (win) {
+        setSent(true)
+      } else {
+        setError('Não conseguimos abrir seu aplicativo de e-mail. A planilha já foi baixada — envie-a manualmente para ' + EMAIL_LOJA)
+      }
+    } catch {
+      setError('Não foi possível enviar o pedido. Verifique sua conexão e tente novamente.')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   const handleNewOrder = () => {
     clearCart()
     setSent(false)
+    setSemAnexo(false)
+    setImagensPersonalizadas([])
     navigate('/')
   }
 
@@ -41,7 +164,14 @@ export default function Order() {
         <div className="success-screen">
           <div className="success-icon">✓</div>
           <h2 className="success-title">pedido enviado!</h2>
-          <p className="success-sub">a loja vai confirmar seu pedido pelo WhatsApp em breve.</p>
+          {semAnexo ? (
+            <p className="success-sub">
+              a loja já recebeu os detalhes do seu pedido. a planilha foi baixada no seu
+              aparelho — envie-a para {EMAIL_LOJA} para concluir.
+            </p>
+          ) : (
+            <p className="success-sub">a loja vai confirmar seu pedido em breve.</p>
+          )}
           <button className="btn-primary" onClick={handleNewOrder}>fazer novo pedido</button>
         </div>
       </div>
@@ -66,32 +196,50 @@ export default function Order() {
           <Link to="/" className="btn-primary" style={{display:'inline-block',marginTop:'12px'}}>escolher pins</Link>
         </div>
       ) : (
-        <>
+        <form onSubmit={handleEnviarPedido}>
           <div className="order-name-field">
-            <label className="field-label">seu nome</label>
+            <label className="field-label">seu nome *</label>
             <input
               className="field-input"
               type="text"
               placeholder="para identificar o pedido"
               value={nome}
               onChange={e => setNome(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="order-name-field">
+            <label className="field-label">seu e-mail *</label>
+            <input
+              className="field-input"
+              type="email"
+              placeholder="para a loja te responder"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
             />
           </div>
 
           <div className="order-items">
             {items.map(item => (
               <div key={item.id} className="order-item">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="order-item-img"
-                  onError={e => { e.target.style.background = '#f3f4f6'; e.target.src = '' }}
-                />
+                {item.custom ? (
+                  <div className="order-item-img order-item-img--custom">+</div>
+                ) : (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="order-item-img"
+                    onError={e => { e.target.src = PLACEHOLDER }}
+                  />
+                )}
                 <div className="order-item-info">
                   <span className="order-item-name">{item.name}</span>
                   <span className="order-item-qty">{item.qty} {item.qty === 1 ? 'unidade' : 'unidades'}</span>
                 </div>
                 <button
+                  type="button"
                   className="remove-btn"
                   onClick={() => removeItem(item.id)}
                   aria-label="remover"
@@ -105,22 +253,43 @@ export default function Order() {
             <span className="order-total-val">{totalQty} {totalQty === 1 ? 'unidade' : 'unidades'}</span>
           </div>
 
+          {hasCustomItem && (
+            <div className="custom-upload">
+              <label className="field-label">imagens do item personalizado</label>
+              <label className="custom-upload-btn">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={e => setImagensPersonalizadas(Array.from(e.target.files))}
+                  hidden
+                />
+                {imagensPersonalizadas.length > 0
+                  ? `${imagensPersonalizadas.length} imagem${imagensPersonalizadas.length > 1 ? 'ns' : ''} selecionada${imagensPersonalizadas.length > 1 ? 's' : ''}`
+                  : 'escolher imagens de referência'}
+              </label>
+              <p className="order-hint">
+                ou envie direto para {EMAIL_LOJA} ou pelo WhatsApp {formatPhone(WHATSAPP_NUMBER)}, mencionando seu nome
+              </p>
+            </div>
+          )}
+
+          {error && <p className="order-error">{error}</p>}
+
           <div className="order-actions">
-            <button className="btn-whatsapp" onClick={handleWhatsapp}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              enviar por WhatsApp
-            </button>
-            <button className="btn-email" onClick={handleEmail}>
+            <button type="submit" className="btn-send" disabled={enviando}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,12 2,6"/>
               </svg>
-              enviar cópia por e-mail
+              {enviando ? 'enviando pedido…' : 'enviar pedido'}
+            </button>
+
+            <button type="button" className="btn-download-link" onClick={handleBaixarPlanilha} disabled={gerandoPlanilha}>
+              {gerandoPlanilha ? 'gerando planilha…' : 'baixar uma cópia da planilha'}
             </button>
           </div>
-        </>
+        </form>
       )}
     </div>
   )

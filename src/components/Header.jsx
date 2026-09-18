@@ -7,8 +7,7 @@ export default function Header() {
   return (
     <header className="header">
       <Link to="/" className="logo">
-        <span className="logo-icon"><img src="/images/logo/gimimo.png" alt="logo gimimo" /></span>
-        <span className="logo-text">Gimimo</span>
+        <img src="/images/logo/gimimo.png" alt="Gimimo" className="logo-icon" />
       </Link>
       <Link to="/pedido" className="cart-link">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

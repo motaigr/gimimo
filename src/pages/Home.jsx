@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom'
 import { bands } from '../data/catalog'
+import PinsGrid from '../components/PinsGrid'
 
 const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect width='120' height='120' rx='60' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='40'%3E%3F%3C/text%3E%3C/svg%3E"
 
 export default function Home() {
+  // Só existe um tema por enquanto: mostra os pins direto, sem tela de seleção.
+  if (bands.length === 1) {
+    return <PinsGrid band={bands[0]} />
+  }
+
   return (
     <div className="home">
       <div className="home-hero">
