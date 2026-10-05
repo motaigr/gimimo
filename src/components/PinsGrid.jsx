@@ -47,6 +47,10 @@ export default function PinsGrid({ band, showBack = false }) {
                     src={pin.image}
                     alt={pin.name}
                     className="pin-img"
+                    width="400"
+                    height="400"
+                    loading="lazy"
+                    decoding="async"
                     onError={e => { e.target.src = PLACEHOLDER }}
                   />
                 )}

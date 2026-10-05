@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react'
+import { createContext, createElement, useContext, useState, useEffect } from 'react'
 
-export function useCart() {
+const STORAGE_KEY = 'gimimo-cart'
+
+// Carrinho compartilhado: um único estado para o app inteiro (Header,
+// catálogo e pedido), para o contador do cabeçalho atualizar na hora.
+const CartContext = createContext(null)
+
+export function CartProvider({ children }) {
   const [cart, setCart] = useState(() => {
     try {
-      const saved = localStorage.getItem('gimimo-cart')
+      const saved = localStorage.getItem(STORAGE_KEY)
       return saved ? JSON.parse(saved) : {}
     } catch {
       return {}
@@ -11,7 +17,9 @@ export function useCart() {
   })
 
   useEffect(() => {
-    localStorage.setItem('gimimo-cart', JSON.stringify(cart))
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cart))
+    } catch { /* navegação privada / armazenamento cheio: segue só em memória */ }
   }, [cart])
 
   const setQty = (pin, qty) => {
@@ -40,5 +48,12 @@ export function useCart() {
   const items = Object.values(cart)
   const totalQty = items.reduce((acc, i) => acc + i.qty, 0)
 
-  return { cart, items, totalQty, setQty, getQty, removeItem, clearCart }
+  const value = { cart, items, totalQty, setQty, getQty, removeItem, clearCart }
+  return createElement(CartContext.Provider, { value }, children)
+}
+
+export function useCart() {
+  const ctx = useContext(CartContext)
+  if (!ctx) throw new Error('useCart precisa estar dentro de <CartProvider>')
+  return ctx
 }

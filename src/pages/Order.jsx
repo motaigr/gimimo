@@ -231,6 +231,7 @@ export default function Order() {
                     src={item.image}
                     alt={item.name}
                     className="order-item-img"
+                    loading="lazy"
                     onError={e => { e.target.src = PLACEHOLDER }}
                   />
                 )}

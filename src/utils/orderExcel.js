@@ -76,6 +76,11 @@ export async function buildOrderWorkbook(items, customerName) {
     row.getCell(3).alignment = { vertical: 'middle' }
     row.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' }
 
+    if (!item.image) {
+      row.getCell(2).value = item.custom ? 'personalizado' : 'sem imagem'
+      continue
+    }
+
     try {
       const base64 = await toCircularPngBase64(item.image)
       const imageId = workbook.addImage({ base64, extension: 'png' })

@@ -49,7 +49,7 @@ export const bands = [
         return {
           id: `SP-${padded}`,
           name: `São Paulo ${String(n).padStart(2, '0')}`,
-          image: `/images/sao-paulo/${padded}.png`,
+          image: `/images/sao-paulo/${padded}.webp`,
         }
       }),
     ],
