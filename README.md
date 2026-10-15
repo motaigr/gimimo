@@ -51,7 +51,7 @@ Ficam em `public/images/NOME-DO-TEMA/`. Use **WebP quadrado com ~400×400px**
 
 O botão "enviar pedido" tenta, nesta ordem:
 
-1. **Função serverless (Netlify + Resend)** — e-mail com a planilha e as
+1. **Função serverless (Vercel + Resend)** — e-mail com a planilha e as
    imagens do item personalizado **anexadas**. Único método com anexo.
 2. **Formspree** — envia o texto do pedido por e-mail; a planilha é baixada
    no aparelho do cliente, e a tela final pede para ele enviá-la (e as
@@ -60,15 +60,19 @@ O botão "enviar pedido" tenta, nesta ordem:
 
 ### Configurar o Resend (anexo automático)
 
-Exige o site publicado no Netlify **e um domínio próprio verificado**.
+Exige o site publicado na Vercel **e um domínio próprio verificado**.
 
 1. Crie uma conta em https://resend.com e verifique seu domínio em *Domains*
 2. Em *API Keys*, crie uma chave (começa com `re_`)
-3. No Netlify: **Site settings → Environment variables**:
+3. Na Vercel: **Project → Settings → Environment Variables**:
    - `RESEND_API_KEY` → a chave
    - `RESEND_FROM` → ex: `Gimimo <pedidos@seudominio.com>`
    - `LOJA_EMAIL` → e-mail que recebe os pedidos
-4. Republique o site
+4. Republique o site (Deployments → Redeploy)
+
+> A Vercel aceita no máximo ~4,5 MB por envio. Se as imagens do cliente
+> forem maiores que isso, o site cai automaticamente no Formspree e pede
+> para ele mandar as imagens por e-mail/WhatsApp.
 
 ### Formspree
 
@@ -77,10 +81,11 @@ em `FORMSPREE_ENDPOINT`. O plano grátis tem limite mensal de envios.
 
 ---
 
-## Publicar (Netlify)
+## Publicar (Vercel)
 
-O `netlify.toml` já está configurado (build `npm run build`, pasta `dist`,
-funções em `netlify/functions`). Conecte o repositório no Netlify e pronto.
+Importe o repositório na Vercel (ela detecta o Vite sozinha: build
+`npm run build`, pasta `dist`). O `vercel.json` faz as páginas (ex: `/pedido`)
+abrirem direto pelo link, e a função de envio fica em `api/send-order.js`.
 
 ---
 
@@ -103,7 +108,7 @@ src/
   utils/
     orderExcel.ts         ← planilha do pedido com as imagens
     sendOrder.ts          ← chama a função de envio
-netlify/functions/
+api/
   send-order.js           ← envia o e-mail com anexos (Resend)
 public/images/            ← fotos dos produtos e logo
 ```

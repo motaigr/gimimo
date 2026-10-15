@@ -80,7 +80,7 @@ export default function Order() {
         URL.revokeObjectURL(url)
       }
 
-      // 1) Função serverless (Netlify + Resend): e-mail com planilha e imagens anexadas.
+      // 1) Função serverless (Vercel + Resend): e-mail com planilha e imagens anexadas.
       const { sendOrderViaFunction } = await import('@/utils/sendOrder')
       if (await sendOrderViaFunction({ nome: cliente, email: replyTo, message, planilha, imagens })) {
         setSent({ planilhaBaixada: false, imagensPendentes: false })

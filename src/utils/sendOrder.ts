@@ -7,7 +7,8 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-// Tenta enviar o pedido pela função serverless (Netlify + Resend), que manda
+// Tenta enviar o pedido pela função serverless (Vercel + Resend, em
+// api/send-order.js), que manda
 // o e-mail com anexos de verdade. Retorna true se enviou com sucesso, false
 // se a função não está disponível/configurada (para o chamador cair no
 // próximo método de envio).
@@ -38,20 +39,20 @@ export async function sendOrderViaFunction({ nome, email, message, planilha, ima
 
   let res
   try {
-    res = await fetch('/.netlify/functions/send-order', {
+    res = await fetch('/api/send-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nome, email, message, attachments }),
     })
   } catch {
-    return false // sem conexão com a função (ex: rodando local sem Netlify)
+    return false // sem conexão com a função
   }
 
   let data
   try {
     data = await res.json()
   } catch {
-    return false // resposta não é da nossa função (ex: fallback de SPA em dev)
+    return false // resposta não é da nossa função (ex: rodando local com `npm run dev`)
   }
 
   if (res.ok && data.ok) return true
