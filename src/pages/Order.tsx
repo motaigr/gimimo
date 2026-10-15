@@ -1,9 +1,10 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Download, ImagePlus, Mail, MessageCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, ImagePlus, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AddressFields, EMPTY_ADDRESS, formatAddress, isAddressComplete } from '@/components/AddressFields'
 import { ProductImage } from '@/components/ProductImage'
 import { QtyControl } from '@/components/QtyControl'
 import {
@@ -22,37 +23,45 @@ type Sent = null | {
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
+// Formata enquanto digita: (11) 98765-4321 ou (11) 3456-7890
+function maskPhone(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 2) return d.length ? `(${d}` : ''
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+}
+
+const labelClass = 'text-xs uppercase tracking-widest'
+
 export default function Order() {
   const { cart, totalItems, hasCustomItem, setQty, removeItem, clear } = useCartStore()
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
+  const [telefone, setTelefone] = useState('')
+  const [endereco, setEndereco] = useState(EMPTY_ADDRESS)
   const [imagens, setImagens] = useState<File[]>([])
   const [error, setError] = useState('')
   const [falhou, setFalhou] = useState(false)
   const [enviando, setEnviando] = useState(false)
-  const [gerandoPlanilha, setGerandoPlanilha] = useState(false)
   const [sent, setSent] = useState<Sent>(null)
   const navigate = useNavigate()
 
+  // telefone só vale com DDD + número (10 ou 11 dígitos)
+  const tel = telefone.replace(/\D/g, '').length >= 10 ? telefone : ''
+
   const buildMessage = (cliente: string) => {
     const linhas = cart.map((i) => `• ${i.name} — ${i.qty} un.`).join('\n')
+    const contato = [
+      tel && `Telefone/WhatsApp: ${tel}`,
+      isAddressComplete(endereco) && `Entrega: ${formatAddress(endereco)}`,
+    ]
+      .filter(Boolean)
+      .join('\n')
     const aviso = hasCustomItem
       ? '\n\n(pedido com item personalizado — imagens de referência em anexo ou enviadas à parte)'
       : ''
-    return `Olá! Sou ${cliente} e gostaria de um orçamento:\n\n${linhas}\n\nTotal: ${totalItems} unidades${aviso}`
-  }
-
-  const baixarPlanilha = async () => {
-    setError('')
-    setGerandoPlanilha(true)
-    try {
-      const { downloadOrderExcel } = await import('@/utils/orderExcel')
-      await downloadOrderExcel(cart, nome.trim())
-    } catch {
-      setError('Não foi possível gerar a planilha. Tente novamente.')
-    } finally {
-      setGerandoPlanilha(false)
-    }
+    return `Olá! Sou ${cliente} e gostaria de um orçamento:\n\n${linhas}\n\nTotal: ${totalItems} unidades${contato ? `\n\n${contato}` : ''}${aviso}`
   }
 
   const enviar = async (e: FormEvent) => {
@@ -63,30 +72,54 @@ export default function Order() {
       setError('Preencha seu nome e e-mail antes de enviar o pedido.')
       return
     }
+    if (telefone && !tel) {
+      setError('Confira o telefone: coloque o DDD e o número, ou deixe em branco.')
+      return
+    }
+    if (!isAddressComplete(endereco)) {
+      setError('Preencha o endereço de entrega completo (CEP, rua, número, bairro, cidade e UF).')
+      return
+    }
     setError('')
     setFalhou(false)
     setEnviando(true)
 
     try {
+      const enderecoTexto = formatAddress(endereco)
+      const contato = [`E-mail: ${replyTo}`, tel && `Telefone: ${tel}`, `Entrega: ${enderecoTexto}`].filter(
+        Boolean,
+      ) as string[]
       const { buildOrderExcelBlob } = await import('@/utils/orderExcel')
-      const planilha = await buildOrderExcelBlob(cart, cliente)
+      const planilha = await buildOrderExcelBlob(cart, cliente, contato)
       const message = buildMessage(cliente)
 
       // 1) Função serverless (Vercel + Resend): a loja recebe o e-mail com a
       // planilha e as imagens anexadas — o cliente não precisa fazer nada.
       const { sendOrderViaFunction } = await import('@/utils/sendOrder')
-      const result = await sendOrderViaFunction({ nome: cliente, email: replyTo, message, planilha, imagens })
+      const result = await sendOrderViaFunction({
+        nome: cliente,
+        email: replyTo,
+        telefone: tel,
+        endereco: enderecoTexto,
+        message,
+        planilha,
+        imagens,
+      })
       if (result.ok) {
-        setSent({ imagensPendentes: result.imagensNaoEnviadas > 0 })
+        setSent({
+          imagensPendentes: result.imagensNaoEnviadas > 0 || (hasCustomItem && imagens.length === 0),
+        })
         return
       }
 
       // 2) Plano B (Resend fora do ar/não configurado): o Formspree manda o
-      // texto do pedido, que já tem todos os itens e quantidades.
+      // texto do pedido, que já tem itens, quantidades, telefone e endereço.
       if (FORMSPREE_ENDPOINT) {
         const form = new FormData()
         form.append('nome', cliente)
         form.append('_replyto', replyTo)
+        if (tel) form.append('telefone', tel)
+        form.append('endereco', enderecoTexto)
         form.append('message', message)
         const res = await fetch(FORMSPREE_ENDPOINT, {
           method: 'POST',
@@ -120,7 +153,8 @@ export default function Order() {
         </div>
         <h1 className="mb-4 font-serif text-4xl">pedido enviado!</h1>
         <p className="mb-8 text-sm leading-relaxed text-gray-500">
-          A Gimimo já recebeu seu pedido e responde com o orçamento no e-mail {email.trim()}.
+          A Gimimo já recebeu seu pedido e responde com o orçamento no e-mail {email.trim()}
+          {tel && ` ou no WhatsApp ${tel}`}.
         </p>
 
         {sent.imagensPendentes && (
@@ -174,7 +208,7 @@ export default function Order() {
           </Button>
         </div>
       ) : (
-        <form onSubmit={enviar} className="space-y-10">
+        <form onSubmit={enviar} className="space-y-12">
           <section className="divide-y divide-gray-100 rounded-3xl border border-gray-100 px-5">
             {cart.map((item) => (
               <div key={item.id} className="flex items-center gap-4 py-4">
@@ -199,7 +233,7 @@ export default function Order() {
 
           {hasCustomItem && (
             <section className="space-y-3 rounded-3xl bg-cream p-6">
-              <Label className="text-xs uppercase tracking-widest">imagens do item personalizado</Label>
+              <Label className={labelClass}>imagens do item personalizado</Label>
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-600 transition-colors hover:border-black hover:text-black">
                 <ImagePlus className="h-5 w-5" />
                 {imagens.length > 0
@@ -220,9 +254,10 @@ export default function Order() {
             </section>
           )}
 
-          <section className="space-y-5">
+          <fieldset className="space-y-5">
+            <legend className="mb-5 font-serif text-2xl">seus dados</legend>
             <div className="space-y-2">
-              <Label htmlFor="nome" className="text-xs uppercase tracking-widest">seu nome *</Label>
+              <Label htmlFor="nome" className={labelClass}>nome *</Label>
               <Input
                 id="nome"
                 value={nome}
@@ -234,7 +269,7 @@ export default function Order() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs uppercase tracking-widest">seu e-mail *</Label>
+              <Label htmlFor="email" className={labelClass}>e-mail *</Label>
               <Input
                 id="email"
                 type="email"
@@ -246,7 +281,24 @@ export default function Order() {
                 className="h-12 rounded-xl"
               />
             </div>
-          </section>
+            <div className="space-y-2">
+              <Label htmlFor="telefone" className={labelClass}>
+                telefone / whatsapp <span className="normal-case tracking-normal text-gray-400">(opcional)</span>
+              </Label>
+              <Input
+                id="telefone"
+                type="tel"
+                inputMode="tel"
+                value={telefone}
+                onChange={(e) => setTelefone(maskPhone(e.target.value))}
+                placeholder="(11) 98765-4321"
+                autoComplete="tel-national"
+                className="h-12 rounded-xl"
+              />
+            </div>
+          </fieldset>
+
+          <AddressFields value={endereco} onChange={setEndereco} />
 
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 
@@ -267,25 +319,14 @@ export default function Order() {
             </div>
           )}
 
-          <div className="flex flex-col items-center gap-4">
-            <Button
-              type="submit"
-              disabled={enviando}
-              className="h-14 w-full rounded-full text-sm font-medium uppercase tracking-widest"
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              {enviando ? 'enviando pedido…' : 'enviar pedido'}
-            </Button>
-            <button
-              type="button"
-              onClick={baixarPlanilha}
-              disabled={gerandoPlanilha}
-              className="inline-flex items-center gap-1.5 text-xs text-gray-500 underline-offset-4 hover:text-black hover:underline disabled:opacity-50"
-            >
-              <Download className="h-3.5 w-3.5" />
-              {gerandoPlanilha ? 'gerando planilha…' : 'baixar uma cópia da planilha'}
-            </button>
-          </div>
+          <Button
+            type="submit"
+            disabled={enviando}
+            className="h-14 w-full rounded-full text-sm font-medium uppercase tracking-widest"
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            {enviando ? 'enviando pedido…' : 'enviar pedido'}
+          </Button>
         </form>
       )}
     </div>

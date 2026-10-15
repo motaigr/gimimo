@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  const { nome, email, message, attachments = [] } = req.body || {}
+  const { nome, email, telefone, endereco, message, attachments = [] } = req.body || {}
   if (!nome || !email || !message) {
     return res.status(400).json({ error: 'Campos obrigatórios ausentes' })
   }
@@ -32,7 +32,15 @@ export default async function handler(req, res) {
       to: [process.env.LOJA_EMAIL],
       replyTo: email,
       subject: `Pedido Gimimo — ${nome}`,
-      text: `${message}\n\n—\nCliente: ${nome}\nE-mail: ${email}`,
+      text: [
+        message,
+        '',
+        '—',
+        `Cliente: ${nome}`,
+        `E-mail: ${email}`,
+        ...(telefone ? [`Telefone: ${telefone}`] : []),
+        ...(endereco ? [`Entrega: ${endereco}`] : []),
+      ].join('\n'),
       attachments: attachments.map((a) => ({ filename: a.filename, content: a.content })),
     })
 

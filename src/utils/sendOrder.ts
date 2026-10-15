@@ -12,6 +12,8 @@ function blobToBase64(blob: Blob): Promise<string> {
 type SendOrderInput = {
   nome: string
   email: string
+  telefone?: string
+  endereco?: string
   message: string
   planilha: { blob: Blob; filename: string }
   imagens?: File[]
@@ -30,6 +32,8 @@ const MAX_PAYLOAD = 4_000_000
 export async function sendOrderViaFunction({
   nome,
   email,
+  telefone,
+  endereco,
   message,
   planilha,
   imagens = [],
@@ -63,7 +67,7 @@ export async function sendOrderViaFunction({
     res = await fetch('/api/send-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome, email, message: message + aviso, attachments }),
+      body: JSON.stringify({ nome, email, telefone, endereco, message: message + aviso, attachments }),
     })
   } catch {
     return { ok: false } // sem conexão com a função

@@ -34,7 +34,8 @@ async function toCircularPngBase64(url: string, size = 160): Promise<string> {
   })
 }
 
-export async function buildOrderWorkbook(items: CartItem[], customerName: string) {
+// contato: linhas extras no topo (e-mail, telefone, endereço…)
+export async function buildOrderWorkbook(items: CartItem[], customerName: string, contato: string[] = []) {
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Pedido')
 
@@ -55,7 +56,15 @@ export async function buildOrderWorkbook(items: CartItem[], customerName: string
   dateCell.value = `Data: ${new Date().toLocaleString('pt-BR')}`
   dateCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF808080' } }
 
-  const headerRowIndex = 4
+  contato.forEach((linha, i) => {
+    const r = 3 + i
+    sheet.mergeCells(`A${r}:D${r}`)
+    const cell = sheet.getCell(`A${r}`)
+    cell.value = linha
+    cell.font = { name: 'Calibri', size: 11 }
+  })
+
+  const headerRowIndex = 4 + contato.length
   const headerRow = sheet.getRow(headerRowIndex)
   headerRow.getCell(2).value = 'IMAGEM'
   headerRow.getCell(3).value = 'TEMA'
@@ -105,8 +114,8 @@ export async function buildOrderWorkbook(items: CartItem[], customerName: string
   return workbook
 }
 
-export async function buildOrderExcelBlob(items: CartItem[], customerName: string) {
-  const workbook = await buildOrderWorkbook(items, customerName)
+export async function buildOrderExcelBlob(items: CartItem[], customerName: string, contato: string[] = []) {
+  const workbook = await buildOrderWorkbook(items, customerName, contato)
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -114,16 +123,4 @@ export async function buildOrderExcelBlob(items: CartItem[], customerName: strin
   const safeName = (customerName || 'cliente').trim().replace(/[^a-zA-Z0-9À-ÿ -]/g, '')
   const filename = `pedido-gimimo-${safeName || 'cliente'}.xlsx`
   return { blob, filename }
-}
-
-export async function downloadOrderExcel(items: CartItem[], customerName: string) {
-  const { blob, filename } = await buildOrderExcelBlob(items, customerName)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
 }
