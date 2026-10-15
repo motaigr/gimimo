@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, ImagePlus, Mail, MessageCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, ImagePlus, Mail, MessageCircle, Store, Trash2, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +14,7 @@ import {
   formatPhone,
   whatsappLink,
 } from '@/lib/catalog'
+import { cn } from '@/lib/utils'
 import useCartStore from '@/stores/useCartStore'
 
 type Sent = null | {
@@ -40,6 +41,7 @@ export default function Order() {
   const [email, setEmail] = useState('')
   const [telefone, setTelefone] = useState('')
   const [endereco, setEndereco] = useState(EMPTY_ADDRESS)
+  const [retirada, setRetirada] = useState(false)
   const [imagens, setImagens] = useState<File[]>([])
   const [error, setError] = useState('')
   const [falhou, setFalhou] = useState(false)
@@ -50,11 +52,18 @@ export default function Order() {
   // telefone só vale com DDD + número (10 ou 11 dígitos)
   const tel = telefone.replace(/\D/g, '').length >= 10 ? telefone : ''
 
+  // como o cliente recebe: endereço formatado ou retirada pessoalmente
+  const entregaTexto = retirada
+    ? 'retirada pessoalmente (combinar local e horário)'
+    : isAddressComplete(endereco)
+      ? formatAddress(endereco)
+      : ''
+
   const buildMessage = (cliente: string) => {
     const linhas = cart.map((i) => `• ${i.name} — ${i.qty} un.`).join('\n')
     const contato = [
       tel && `Telefone/WhatsApp: ${tel}`,
-      isAddressComplete(endereco) && `Entrega: ${formatAddress(endereco)}`,
+      entregaTexto && `Entrega: ${entregaTexto}`,
     ]
       .filter(Boolean)
       .join('\n')
@@ -76,7 +85,7 @@ export default function Order() {
       setError('Confira o telefone: coloque o DDD e o número, ou deixe em branco.')
       return
     }
-    if (!isAddressComplete(endereco)) {
+    if (!retirada && !isAddressComplete(endereco)) {
       setError('Preencha o endereço de entrega completo (CEP, rua, número, bairro, cidade e UF).')
       return
     }
@@ -85,7 +94,7 @@ export default function Order() {
     setEnviando(true)
 
     try {
-      const enderecoTexto = formatAddress(endereco)
+      const enderecoTexto = entregaTexto
       const contato = [`E-mail: ${replyTo}`, tel && `Telefone: ${tel}`, `Entrega: ${enderecoTexto}`].filter(
         Boolean,
       ) as string[]
@@ -298,7 +307,44 @@ export default function Order() {
             </div>
           </fieldset>
 
-          <AddressFields value={endereco} onChange={setEndereco} />
+          <section className="space-y-5">
+            <h2 className="font-serif text-2xl">como você quer receber?</h2>
+            <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Forma de recebimento">
+              {[
+                { value: false, icon: Truck, label: 'entrega', hint: 'no seu endereço' },
+                { value: true, icon: Store, label: 'retirar pessoalmente', hint: 'combinamos local e horário' },
+              ].map((opt) => {
+                const Icon = opt.icon
+                const active = retirada === opt.value
+                return (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setRetirada(opt.value)}
+                    className={cn(
+                      'flex flex-col items-start gap-1 rounded-2xl border-2 px-4 py-4 text-left transition-colors',
+                      active ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-gray-400',
+                    )}
+                  >
+                    <Icon className="mb-1 h-5 w-5" />
+                    <span className="text-xs font-semibold uppercase tracking-widest">{opt.label}</span>
+                    <span className={cn('text-xs', active ? 'text-white/70' : 'text-gray-500')}>{opt.hint}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {retirada ? (
+              <p className="rounded-2xl bg-cream px-5 py-4 text-sm text-gray-600 animate-fade-in">
+                A Gimimo combina com você o local e o horário da retirada
+                {tel ? ' pelo WhatsApp.' : ' por e-mail — se preferir WhatsApp, preencha o telefone acima.'}
+              </p>
+            ) : (
+              <AddressFields value={endereco} onChange={setEndereco} />
+            )}
+          </section>
 
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
 

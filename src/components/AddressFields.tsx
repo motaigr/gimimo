@@ -89,7 +89,7 @@ export function AddressFields({ value, onChange }: AddressFieldsProps) {
 
   return (
     <fieldset className="space-y-5">
-      <legend className="mb-5 font-serif text-2xl">endereço de entrega</legend>
+      <legend className="sr-only">endereço de entrega</legend>
 
       <div className="space-y-2">
         <Label htmlFor="end-cep" className={labelClass}>cep *</Label>
