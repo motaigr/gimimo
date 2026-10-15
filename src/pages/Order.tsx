@@ -16,8 +16,7 @@ import {
 import useCartStore from '@/stores/useCartStore'
 
 type Sent = null | {
-  // o que não foi junto automaticamente e o cliente precisa mandar à parte
-  planilhaBaixada: boolean
+  // imagens do personalizado que não foram junto e o cliente precisa mandar
   imagensPendentes: boolean
 }
 
@@ -29,6 +28,7 @@ export default function Order() {
   const [email, setEmail] = useState('')
   const [imagens, setImagens] = useState<File[]>([])
   const [error, setError] = useState('')
+  const [falhou, setFalhou] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [gerandoPlanilha, setGerandoPlanilha] = useState(false)
   const [sent, setSent] = useState<Sent>(null)
@@ -64,6 +64,7 @@ export default function Order() {
       return
     }
     setError('')
+    setFalhou(false)
     setEnviando(true)
 
     try {
@@ -71,24 +72,17 @@ export default function Order() {
       const planilha = await buildOrderExcelBlob(cart, cliente)
       const message = buildMessage(cliente)
 
-      const salvarPlanilha = () => {
-        const url = URL.createObjectURL(planilha.blob)
-        const a = Object.assign(document.createElement('a'), { href: url, download: planilha.filename })
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        URL.revokeObjectURL(url)
-      }
-
-      // 1) Função serverless (Vercel + Resend): e-mail com planilha e imagens anexadas.
+      // 1) Função serverless (Vercel + Resend): a loja recebe o e-mail com a
+      // planilha e as imagens anexadas — o cliente não precisa fazer nada.
       const { sendOrderViaFunction } = await import('@/utils/sendOrder')
-      if (await sendOrderViaFunction({ nome: cliente, email: replyTo, message, planilha, imagens })) {
-        setSent({ planilhaBaixada: false, imagensPendentes: false })
+      const result = await sendOrderViaFunction({ nome: cliente, email: replyTo, message, planilha, imagens })
+      if (result.ok) {
+        setSent({ imagensPendentes: result.imagensNaoEnviadas > 0 })
         return
       }
 
-      // 2) Formspree: o plano grátis não aceita anexos, então envia o texto
-      // e baixa a planilha no aparelho do cliente.
+      // 2) Plano B (Resend fora do ar/não configurado): o Formspree manda o
+      // texto do pedido, que já tem todos os itens e quantidades.
       if (FORMSPREE_ENDPOINT) {
         const form = new FormData()
         form.append('nome', cliente)
@@ -100,20 +94,14 @@ export default function Order() {
           headers: { Accept: 'application/json' },
         })
         if (res.ok) {
-          salvarPlanilha()
-          setSent({ planilhaBaixada: true, imagensPendentes: hasCustomItem })
+          setSent({ imagensPendentes: hasCustomItem })
           return
         }
       }
 
-      // 3) Último recurso: baixa a planilha e abre o e-mail pronto.
-      salvarPlanilha()
-      const subject = encodeURIComponent(`Pedido Gimimo — ${cliente}`)
-      const body = encodeURIComponent(`${message}\n\n(anexe a planilha que foi baixada)`)
-      window.location.href = `mailto:${EMAIL_LOJA}?subject=${subject}&body=${body}`
-      setSent({ planilhaBaixada: true, imagensPendentes: hasCustomItem })
+      setFalhou(true)
     } catch {
-      setError('Não foi possível enviar o pedido. Verifique sua conexão e tente novamente.')
+      setFalhou(true)
     } finally {
       setEnviando(false)
     }
@@ -125,7 +113,6 @@ export default function Order() {
   }
 
   if (sent) {
-    const pendente = sent.planilhaBaixada || sent.imagensPendentes
     return (
       <div className="container mx-auto flex max-w-md flex-col items-center px-6 py-20 text-center animate-fade-in-up">
         <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-brand-sage/30">
@@ -136,13 +123,12 @@ export default function Order() {
           A Gimimo já recebeu seu pedido e responde com o orçamento no e-mail {email.trim()}.
         </p>
 
-        {pendente && (
+        {sent.imagensPendentes && (
           <div className="mb-8 w-full space-y-3 rounded-2xl bg-cream p-6 text-left text-sm">
-            <p className="font-medium">Para concluir, envie para a loja:</p>
-            <ul className="list-disc space-y-1 pl-5 text-gray-600">
-              {sent.planilhaBaixada && <li>a planilha do pedido (já baixada no seu aparelho)</li>}
-              {sent.imagensPendentes && <li>as imagens do item personalizado</li>}
-            </ul>
+            <p className="font-medium">Falta só uma coisa:</p>
+            <p className="text-gray-600">
+              envie as imagens do item personalizado para a loja, mencionando seu nome.
+            </p>
             <div className="flex flex-wrap gap-x-5 gap-y-2 pt-2 text-xs">
               <a href={`mailto:${EMAIL_LOJA}`} className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline">
                 <Mail className="h-3.5 w-3.5" /> {EMAIL_LOJA}
@@ -263,6 +249,23 @@ export default function Order() {
           </section>
 
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+
+          {falhou && (
+            <div className="space-y-3 rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700">
+              <p>
+                Não conseguimos enviar o pedido agora. Tente de novo em instantes ou mande pelo
+                WhatsApp:
+              </p>
+              <a
+                href={whatsappLink(buildMessage(nome.trim() || 'cliente'))}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 font-medium underline-offset-4 hover:underline"
+              >
+                <MessageCircle className="h-4 w-4" /> enviar pedido pelo WhatsApp
+              </a>
+            </div>
+          )}
 
           <div className="flex flex-col items-center gap-4">
             <Button

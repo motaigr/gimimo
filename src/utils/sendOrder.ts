@@ -1,3 +1,5 @@
+import { compressImage } from './compressImage'
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -7,54 +9,71 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-// Tenta enviar o pedido pela função serverless (Vercel + Resend, em
-// api/send-order.js), que manda
-// o e-mail com anexos de verdade. Retorna true se enviou com sucesso, false
-// se a função não está disponível/configurada (para o chamador cair no
-// próximo método de envio).
 type SendOrderInput = {
   nome: string
   email: string
   message: string
-  planilha?: { blob: Blob; filename: string }
+  planilha: { blob: Blob; filename: string }
   imagens?: File[]
 }
 
-export async function sendOrderViaFunction({ nome, email, message, planilha, imagens = [] }: SendOrderInput) {
-  const attachments = []
+export type SendOrderResult =
+  | { ok: true; imagensNaoEnviadas: number } // imagens que não couberam no envio
+  | { ok: false }
 
-  if (planilha) {
-    attachments.push({
-      filename: planilha.filename,
-      content: await blobToBase64(planilha.blob),
-    })
+// Limite da Vercel é ~4,5 MB por requisição; deixa folga para o JSON.
+const MAX_PAYLOAD = 4_000_000
+
+// Envia o pedido pela função serverless (Vercel + Resend, em api/send-order.js),
+// com a planilha e as imagens do cliente anexadas. Retorna ok: false se a
+// função não está disponível/configurada, para o chamador usar o plano B.
+export async function sendOrderViaFunction({
+  nome,
+  email,
+  message,
+  planilha,
+  imagens = [],
+}: SendOrderInput): Promise<SendOrderResult> {
+  const attachments = [{ filename: planilha.filename, content: await blobToBase64(planilha.blob) }]
+  let size = attachments[0].content.length + message.length
+  let imagensNaoEnviadas = 0
+
+  for (const original of imagens) {
+    // tamanho normal; se não couber, uma versão menor; se nem assim, fica de fora
+    let file = await compressImage(original)
+    let content = await blobToBase64(file)
+    if (size + content.length > MAX_PAYLOAD) {
+      file = await compressImage(original, 1000, 0.7)
+      content = await blobToBase64(file)
+    }
+    if (size + content.length > MAX_PAYLOAD) {
+      imagensNaoEnviadas++
+      continue
+    }
+    attachments.push({ filename: file.name, content })
+    size += content.length
   }
 
-  for (const file of imagens) {
-    attachments.push({
-      filename: file.name,
-      content: await blobToBase64(file),
-    })
-  }
+  const aviso = imagensNaoEnviadas
+    ? `\n\n(${imagensNaoEnviadas} imagem(ns) do cliente não couberam no envio — pedir por WhatsApp)`
+    : ''
 
-  let res
+  let res: Response
   try {
     res = await fetch('/api/send-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome, email, message, attachments }),
+      body: JSON.stringify({ nome, email, message: message + aviso, attachments }),
     })
   } catch {
-    return false // sem conexão com a função
+    return { ok: false } // sem conexão com a função
   }
 
-  let data
   try {
-    data = await res.json()
+    const data = await res.json()
+    if (res.ok && data.ok) return { ok: true, imagensNaoEnviadas }
   } catch {
-    return false // resposta não é da nossa função (ex: rodando local com `npm run dev`)
+    /* resposta não é da nossa função (ex: rodando local com `npm run dev`) */
   }
-
-  if (res.ok && data.ok) return true
-  return false
+  return { ok: false }
 }

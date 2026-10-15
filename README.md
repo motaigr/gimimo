@@ -49,30 +49,40 @@ Ficam em `public/images/NOME-DO-TEMA/`. Use **WebP quadrado com ~400×400px**
 
 ## Envio do pedido
 
-O botão "enviar pedido" tenta, nesta ordem:
+O cliente só clica em "enviar pedido" — **não baixa nem envia nada**. O site:
 
-1. **Função serverless (Vercel + Resend)** — e-mail com a planilha e as
-   imagens do item personalizado **anexadas**. Único método com anexo.
-2. **Formspree** — envia o texto do pedido por e-mail; a planilha é baixada
-   no aparelho do cliente, e a tela final pede para ele enviá-la (e as
-   imagens) por e-mail ou WhatsApp.
-3. **Abrir o e-mail do cliente** com o pedido pronto — último recurso.
+1. **Função serverless (Vercel + Resend)** — a loja recebe um e-mail com o
+   pedido, a **planilha anexada** (com as imagens dos itens) e as **imagens
+   do item personalizado**. As fotos do cliente são reduzidas antes do envio
+   (a Vercel aceita até ~4,5 MB por envio); se mesmo assim não couberem
+   todas, o e-mail avisa quantas faltaram e o cliente é orientado a mandá-las.
+2. **Formspree (plano B)** — se o Resend estiver fora do ar ou não
+   configurado, a loja recebe o texto do pedido (itens e quantidades) por
+   e-mail, sem anexos.
+3. Se os dois falharem, o cliente vê um botão para mandar o pedido pronto
+   pelo WhatsApp.
 
-### Configurar o Resend (anexo automático)
+### Configurar o Resend (obrigatório para os anexos)
 
-Exige o site publicado na Vercel **e um domínio próprio verificado**.
+**Não precisa de domínio próprio**: sem domínio, o Resend só envia para o
+e-mail com que a conta foi criada — então crie a conta com o **e-mail da
+loja** (o mesmo que recebe os pedidos).
 
-1. Crie uma conta em https://resend.com e verifique seu domínio em *Domains*
-2. Em *API Keys*, crie uma chave (começa com `re_`)
+1. Crie uma conta em https://resend.com com o e-mail da loja
+   (`gimimoandco@gmail.com`)
+2. Em *API Keys*, crie uma chave (começa com `re_`) e copie
 3. Na Vercel: **Project → Settings → Environment Variables**:
    - `RESEND_API_KEY` → a chave
-   - `RESEND_FROM` → ex: `Gimimo <pedidos@seudominio.com>`
-   - `LOJA_EMAIL` → e-mail que recebe os pedidos
+   - `LOJA_EMAIL` → `gimimoandco@gmail.com`
 4. Republique o site (Deployments → Redeploy)
+5. Faça um pedido de teste e confira a caixa de entrada (e o spam, na
+   primeira vez)
 
-> A Vercel aceita no máximo ~4,5 MB por envio. Se as imagens do cliente
-> forem maiores que isso, o site cai automaticamente no Formspree e pede
-> para ele mandar as imagens por e-mail/WhatsApp.
+Os e-mails chegam do remetente `onboarding@resend.dev`. Se um dia tiverem
+domínio próprio (ex: gimimo.com.br), verifique o domínio em *Domains* no
+Resend e adicione `RESEND_FROM` → `Gimimo <pedidos@gimimo.com.br>`.
+
+Plano grátis do Resend: 100 e-mails/dia, 3.000/mês.
 
 ### Formspree
 

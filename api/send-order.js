@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       to: [process.env.LOJA_EMAIL],
       replyTo: email,
       subject: `Pedido Gimimo — ${nome}`,
-      text: message,
+      text: `${message}\n\n—\nCliente: ${nome}\nE-mail: ${email}`,
       attachments: attachments.map((a) => ({ filename: a.filename, content: a.content })),
     })
 
