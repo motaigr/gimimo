@@ -1,4 +1,4 @@
-const { Resend } = require('resend')
+import { Resend } from 'resend'
 
 // Variáveis de ambiente configuradas no painel do Netlify (Site settings →
 // Environment variables), nunca expostas ao navegador do cliente:
@@ -7,7 +7,7 @@ const { Resend } = require('resend')
 //                     (precisa ser um domínio verificado no Resend)
 //   LOJA_EMAIL      → e-mail da loja que vai receber os pedidos
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }

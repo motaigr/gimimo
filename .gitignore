@@ -1,9 +1,15 @@
 node_modules/
 dist/
+dev-dist/
 .netlify/
+*.local
+*.log
 .env
 .env.*
+.DS_Store
+.eslintcache
+.oxlintcache
 
-# planilhas internas — não publicar
+# planilhas internas e imagens originais — não publicar
 private/
 referencia/
