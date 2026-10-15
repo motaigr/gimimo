@@ -1,9 +1,9 @@
 # Gimimo — catálogo de pins e personalizados
 
 Catálogo online da Gimimo: o cliente escolhe os produtos, monta o pedido e
-envia para **orçamento** (sem preços no site). O pedido chega por e-mail com
-uma planilha (com as imagens dos itens) e, se houver, as artes do item
-personalizado. Sem banco de dados, sem mensalidade.
+envia para **orçamento** (sem preços no site). O pedido cai direto numa
+planilha do Google Sheets da loja, uma linha por item, e as artes do item
+personalizado vão para o Google Drive. Sem banco de dados, sem mensalidade.
 
 Feito com React + Vite + TypeScript + Tailwind (componentes shadcn/ui).
 
@@ -29,7 +29,8 @@ Abre em http://localhost:5173
 
 Tudo fica em `src/lib/catalog.ts`:
 
-- **Contato da loja:** `WHATSAPP_NUMBER`, `EMAIL_LOJA`, `FORMSPREE_ENDPOINT`.
+- **Contato da loja:** `WHATSAPP_NUMBER`, `EMAIL_LOJA`.
+- **Envio dos pedidos:** `PLANILHA_ENDPOINT` (Google Sheets) e `FORMSPREE_ENDPOINT` (plano B).
 - **Tipos de produto** (`PRODUCT_TYPES`): são os botões da barra inferior
   (Pins, Canecas, Garrafas). Para um tipo novo, adicione um item com `id`,
   nome, título, subtítulo e um ícone do [lucide](https://lucide.dev/icons).
@@ -47,47 +48,62 @@ Ficam em `public/images/NOME-DO-TEMA/`. Use **WebP quadrado com ~400×400px**
 
 ---
 
-## Envio do pedido
+## Pedidos no Google Sheets
 
-O cliente só clica em "enviar pedido" — **não baixa nem envia nada**. O site:
+O cliente só clica em "enviar pedido" — **não baixa nem envia nada**. O pedido
+cai direto numa planilha do Google Sheets da loja:
 
-1. **Função serverless (Vercel + Resend)** — a loja recebe um e-mail com o
-   pedido, a **planilha anexada** (com as imagens dos itens) e as **imagens
-   do item personalizado**. As fotos do cliente são reduzidas antes do envio
-   (a Vercel aceita até ~4,5 MB por envio); se mesmo assim não couberem
-   todas, o e-mail avisa quantas faltaram e o cliente é orientado a mandá-las.
-2. **Formspree (plano B)** — se o Resend estiver fora do ar ou não
-   configurado, a loja recebe o texto do pedido (itens e quantidades) por
-   e-mail, sem anexos.
-3. Se os dois falharem, o cliente vê um botão para mandar o pedido pronto
-   pelo WhatsApp.
+- **uma linha por item**: data, nº do pedido, cliente, e-mail, telefone,
+  entrega (endereço ou retirada), foto do produto, produto, tipo, tema,
+  quantidade, link das imagens do cliente, **status** (lista para escolher:
+  novo, orçamento enviado, aprovado, em produção…) e observações;
+- as **imagens do item personalizado** vão para uma pasta no Google Drive
+  ("Gimimo — imagens dos pedidos", uma subpasta por pedido);
+- chega um **e-mail de aviso** para a dona da planilha a cada pedido novo.
 
-### Configurar o Resend (obrigatório para os anexos)
+Para baixar como Excel: *Arquivo → Fazer download → Microsoft Excel (.xlsx)*
+(é uma cópia daquele momento; os pedidos novos continuam entrando no Sheets).
 
-**Não precisa de domínio próprio**: sem domínio, o Resend só envia para o
-e-mail com que a conta foi criada — então crie a conta com o **e-mail da
-loja** (o mesmo que recebe os pedidos).
+Se a planilha não responder, o site usa o **Formspree** como plano B (manda o
+texto do pedido por e-mail). Se os dois falharem, o cliente vê um botão para
+mandar o pedido pelo WhatsApp.
 
-1. Crie uma conta em https://resend.com com o e-mail da loja
-   (`gimimoandco@gmail.com`)
-2. Em *API Keys*, crie uma chave (começa com `re_`) e copie
-3. Na Vercel: **Project → Settings → Environment Variables**:
-   - `RESEND_API_KEY` → a chave
-   - `LOJA_EMAIL` → `gimimoandco@gmail.com`
-4. Republique o site (Deployments → Redeploy)
-5. Faça um pedido de teste e confira a caixa de entrada (e o spam, na
-   primeira vez)
+### Instalar (uma vez só, ~10 minutos)
 
-Os e-mails chegam do remetente `onboarding@resend.dev`. Se um dia tiverem
-domínio próprio (ex: gimimo.com.br), verifique o domínio em *Domains* no
-Resend e adicione `RESEND_FROM` → `Gimimo <pedidos@gimimo.com.br>`.
+Faça logado na conta Google da loja (gimimoandco@gmail.com):
 
-Plano grátis do Resend: 100 e-mails/dia, 3.000/mês.
+1. Crie uma planilha nova em https://sheets.new e dê um nome (ex: "Pedidos Gimimo")
+2. Menu **Extensões → Apps Script**
+3. Apague o que estiver no editor, cole todo o conteúdo de
+   [`apps-script/Code.gs`](apps-script/Code.gs) e salve (ícone de disquete)
+4. No topo, escolha a função **`configurar`** e clique em **Executar**
+   - O Google vai pedir permissão (planilha, Drive e e-mail): *Revisar
+     permissões → escolher a conta → Avançado → Acessar (não seguro) →
+     Permitir*. O aviso aparece porque o script é seu e não foi publicado na
+     loja do Google — é normal.
+   - Isso cria a aba "Pedidos" com o cabeçalho e a pasta no Drive.
+5. **Implantar → Nova implantação** → engrenagem → **App da Web**:
+   - *Executar como:* **Eu**
+   - *Quem pode acessar:* **Qualquer pessoa**
+   - Clique em **Implantar** e copie a **URL do app da Web**
+     (termina em `/exec`)
+6. Cole a URL em `src/lib/catalog.ts`:
+   ```ts
+   export const PLANILHA_ENDPOINT = 'https://script.google.com/macros/s/XXXX/exec'
+   ```
+7. Faça commit/push — a Vercel republica sozinha — e faça um **pedido de teste**
 
-### Formspree
+**Se alterar o `Code.gs` depois:** Implantar → Gerenciar implantações → lápis →
+*Versão: Nova versão* → Implantar (assim a URL continua a mesma).
+
+Limites do Google (conta grátis): 100 e-mails de aviso por dia; cada pedido
+leva poucos segundos. Para desligar o e-mail, mude `AVISAR_POR_EMAIL` para
+`false` no script.
+
+### Formspree (plano B)
 
 Crie um formulário em https://formspree.io com o e-mail da loja e cole a URL
-em `FORMSPREE_ENDPOINT`. O plano grátis tem limite mensal de envios.
+em `FORMSPREE_ENDPOINT`. Se não quiser plano B, deixe `''`.
 
 ---
 
@@ -95,7 +111,7 @@ em `FORMSPREE_ENDPOINT`. O plano grátis tem limite mensal de envios.
 
 Importe o repositório na Vercel (ela detecta o Vite sozinha: build
 `npm run build`, pasta `dist`). O `vercel.json` faz as páginas (ex: `/pedido`)
-abrirem direto pelo link, e a função de envio fica em `api/send-order.js`.
+abrirem direto pelo link.
 
 ---
 
@@ -115,10 +131,11 @@ src/
     Header.tsx, Layout.tsx
     ui/                   ← componentes shadcn/ui
   stores/useCartStore.ts  ← carrinho (salvo no navegador)
+  components/AddressFields.tsx ← endereço com busca de CEP
   utils/
-    orderExcel.ts         ← planilha do pedido com as imagens
-    sendOrder.ts          ← chama a função de envio
-api/
-  send-order.js           ← envia o e-mail com anexos (Resend)
+    sendOrder.ts          ← envia o pedido para a planilha
+    compressImage.ts      ← reduz as fotos do cliente antes do envio
+apps-script/
+  Code.gs                 ← script da planilha (Google Sheets + Drive)
 public/images/            ← fotos dos produtos e logo
 ```

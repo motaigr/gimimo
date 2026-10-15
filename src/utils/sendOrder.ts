@@ -1,3 +1,5 @@
+import { PLANILHA_ENDPOINT, getProductType, getTheme } from '@/lib/catalog'
+import type { CartItem } from '@/stores/useCartStore'
 import { compressImage } from './compressImage'
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -13,71 +15,72 @@ type SendOrderInput = {
   nome: string
   email: string
   telefone?: string
-  endereco?: string
-  message: string
-  planilha: { blob: Blob; filename: string }
+  entrega: string
+  itens: CartItem[]
   imagens?: File[]
 }
 
 export type SendOrderResult =
-  | { ok: true; imagensNaoEnviadas: number } // imagens que não couberam no envio
+  | { ok: true; pedido: string; imagensNaoEnviadas: number }
   | { ok: false }
 
-// Limite da Vercel é ~4,5 MB por requisição; deixa folga para o JSON.
-const MAX_PAYLOAD = 4_000_000
+// Folga abaixo do limite do Apps Script (~50 MB por envio)
+const MAX_IMAGENS_BYTES = 20_000_000
 
-// Envia o pedido pela função serverless (Vercel + Resend, em api/send-order.js),
-// com a planilha e as imagens do cliente anexadas. Retorna ok: false se a
-// função não está disponível/configurada, para o chamador usar o plano B.
-export async function sendOrderViaFunction({
+// Envia o pedido para o Google Apps Script (apps-script/Code.gs), que
+// preenche a planilha do Google Sheets — uma linha por item — e guarda as
+// imagens do cliente no Google Drive. Retorna ok: false se não estiver
+// configurado ou não responder, para o chamador usar o plano B.
+export async function sendOrderToSheet({
   nome,
   email,
   telefone,
-  endereco,
-  message,
-  planilha,
+  entrega,
+  itens,
   imagens = [],
 }: SendOrderInput): Promise<SendOrderResult> {
-  const attachments = [{ filename: planilha.filename, content: await blobToBase64(planilha.blob) }]
-  let size = attachments[0].content.length + message.length
-  let imagensNaoEnviadas = 0
+  if (!PLANILHA_ENDPOINT) return { ok: false }
 
+  const enviadas: { nome: string; tipo: string; conteudo: string }[] = []
+  let total = 0
+  let imagensNaoEnviadas = 0
   for (const original of imagens) {
-    // tamanho normal; se não couber, uma versão menor; se nem assim, fica de fora
-    let file = await compressImage(original)
-    let content = await blobToBase64(file)
-    if (size + content.length > MAX_PAYLOAD) {
-      file = await compressImage(original, 1000, 0.7)
-      content = await blobToBase64(file)
-    }
-    if (size + content.length > MAX_PAYLOAD) {
+    const file = await compressImage(original)
+    const conteudo = await blobToBase64(file)
+    if (total + conteudo.length > MAX_IMAGENS_BYTES) {
       imagensNaoEnviadas++
       continue
     }
-    attachments.push({ filename: file.name, content })
-    size += content.length
+    enviadas.push({ nome: file.name, tipo: file.type || 'image/jpeg', conteudo })
+    total += conteudo.length
   }
 
-  const aviso = imagensNaoEnviadas
-    ? `\n\n(${imagensNaoEnviadas} imagem(ns) do cliente não couberam no envio — pedir por WhatsApp)`
-    : ''
-
-  let res: Response
-  try {
-    res = await fetch('/api/send-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome, email, telefone, endereco, message: message + aviso, attachments }),
-    })
-  } catch {
-    return { ok: false } // sem conexão com a função
+  const body = {
+    nome,
+    email,
+    telefone: telefone || '',
+    entrega,
+    imagensNaoEnviadas,
+    itens: itens.map((i) => ({
+      nome: i.name,
+      tipo: getProductType(i.type).label,
+      tema: getTheme(i.theme)?.name ?? '',
+      qtd: i.qty,
+      personalizado: !!i.custom,
+      // endereço completo para a planilha mostrar a foto do produto
+      imagem: i.image ? new URL(i.image, window.location.origin).href : '',
+    })),
+    imagens: enviadas,
   }
 
   try {
+    // Sem cabeçalho Content-Type (vai como text/plain): o Apps Script não
+    // responde à checagem de CORS que um envio JSON dispararia.
+    const res = await fetch(PLANILHA_ENDPOINT, { method: 'POST', body: JSON.stringify(body) })
     const data = await res.json()
-    if (res.ok && data.ok) return { ok: true, imagensNaoEnviadas }
+    if (data.ok) return { ok: true, pedido: data.pedido, imagensNaoEnviadas }
   } catch {
-    /* resposta não é da nossa função (ex: rodando local com `npm run dev`) */
+    /* sem conexão ou script fora do ar */
   }
   return { ok: false }
 }

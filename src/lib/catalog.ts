@@ -12,8 +12,13 @@ import { CircleDot, Coffee, Milk } from 'lucide-react'
 export const WHATSAPP_NUMBER = '5511982204504' // DDI + DDD + número, sem espaços
 export const EMAIL_LOJA = 'gimimoandco@gmail.com'
 
-// Endpoint do Formspree (formspree.io). O plano grátis envia só o texto do
-// pedido; a planilha é baixada no aparelho do cliente.
+// URL do Google Apps Script que recebe os pedidos e preenche a planilha do
+// Google Sheets (ver apps-script/Code.gs e o README). Formato:
+// https://script.google.com/macros/s/XXXXXXXX/exec
+export const PLANILHA_ENDPOINT = ''
+
+// Plano B, se a planilha não responder: o Formspree (formspree.io) manda o
+// texto do pedido por e-mail para a loja.
 export const FORMSPREE_ENDPOINT = 'https://formspree.io/f/myezyqgn'
 
 export type ProductTypeId = 'pins' | 'canecas' | 'garrafas'

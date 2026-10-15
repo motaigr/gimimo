@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import useCartStore from '@/stores/useCartStore'
 
 type Sent = null | {
+  pedido?: string // número do pedido gerado pela planilha
   // imagens do personalizado que não foram junto e o cliente precisa mandar
   imagensPendentes: boolean
 }
@@ -94,42 +95,34 @@ export default function Order() {
     setEnviando(true)
 
     try {
-      const enderecoTexto = entregaTexto
-      const contato = [`E-mail: ${replyTo}`, tel && `Telefone: ${tel}`, `Entrega: ${enderecoTexto}`].filter(
-        Boolean,
-      ) as string[]
-      const { buildOrderExcelBlob } = await import('@/utils/orderExcel')
-      const planilha = await buildOrderExcelBlob(cart, cliente, contato)
-      const message = buildMessage(cliente)
-
-      // 1) Função serverless (Vercel + Resend): a loja recebe o e-mail com a
-      // planilha e as imagens anexadas — o cliente não precisa fazer nada.
-      const { sendOrderViaFunction } = await import('@/utils/sendOrder')
-      const result = await sendOrderViaFunction({
+      // 1) Planilha do Google Sheets (Apps Script): uma linha por item, imagens
+      // do cliente no Google Drive e aviso por e-mail para a loja.
+      const { sendOrderToSheet } = await import('@/utils/sendOrder')
+      const result = await sendOrderToSheet({
         nome: cliente,
         email: replyTo,
         telefone: tel,
-        endereco: enderecoTexto,
-        message,
-        planilha,
+        entrega: entregaTexto,
+        itens: cart,
         imagens,
       })
       if (result.ok) {
         setSent({
+          pedido: result.pedido,
           imagensPendentes: result.imagensNaoEnviadas > 0 || (hasCustomItem && imagens.length === 0),
         })
         return
       }
 
-      // 2) Plano B (Resend fora do ar/não configurado): o Formspree manda o
-      // texto do pedido, que já tem itens, quantidades, telefone e endereço.
+      // 2) Plano B (planilha fora do ar/não configurada): o Formspree manda o
+      // texto do pedido por e-mail, com itens, quantidades, telefone e entrega.
       if (FORMSPREE_ENDPOINT) {
         const form = new FormData()
         form.append('nome', cliente)
         form.append('_replyto', replyTo)
         if (tel) form.append('telefone', tel)
-        form.append('endereco', enderecoTexto)
-        form.append('message', message)
+        form.append('entrega', entregaTexto)
+        form.append('message', buildMessage(cliente))
         const res = await fetch(FORMSPREE_ENDPOINT, {
           method: 'POST',
           body: form,
@@ -161,6 +154,11 @@ export default function Order() {
           <Check className="h-9 w-9 text-brand-sage-dark" />
         </div>
         <h1 className="mb-4 font-serif text-4xl">pedido enviado!</h1>
+        {sent.pedido && (
+          <p className="mb-4 rounded-full bg-cream px-4 py-1.5 text-xs font-medium tracking-widest">
+            nº {sent.pedido}
+          </p>
+        )}
         <p className="mb-8 text-sm leading-relaxed text-gray-500">
           A Gimimo já recebeu seu pedido e responde com o orçamento no e-mail {email.trim()}
           {tel && ` ou no WhatsApp ${tel}`}.
