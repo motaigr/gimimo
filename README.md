@@ -25,26 +25,57 @@ Abre em http://localhost:5173
 
 ---
 
-## Como adicionar produtos
+## Como adicionar bottons e outros produtos (sem mexer no código)
 
-Tudo fica em `src/lib/catalog.ts`:
+Os produtos vêm da pasta **"Catálogo Gimimo"** no Google Drive da loja:
+
+```
+Catálogo Gimimo/
+  Bottons/
+    São Paulo/
+      São Paulo 01.jpg
+      São Paulo 02.jpg
+    AC-DC/
+      Highway to Hell.png
+  Canecas/
+    Times/
+      Caneca Corinthians.jpg
+  Garrafas/
+```
+
+1. **Arraste as fotos** para a pasta do tema certo (pelo computador ou pelo
+   app do Google Drive no celular). **O nome do arquivo vira o nome do
+   modelo** no site. Uma pasta nova dentro de Bottons/Canecas/Garrafas vira
+   um tema novo, com filtro no topo da página.
+2. Na planilha de pedidos: menu **Gimimo → Publicar site**.
+3. Em 1–2 minutos o site está atualizado (as fotos são convertidas e
+   otimizadas automaticamente: quadradas, 400×400, WebP).
+
+Dicas:
+- Use **JPG ou PNG** (fotos HEIC do iPhone não são aceitas; no iPhone,
+  Ajustes → Câmera → Formatos → "Mais Compatível").
+- Para **tirar um modelo do site sem apagar**, coloque `_` no começo do nome
+  do arquivo (ou da pasta do tema) e publique de novo.
+- A ordem é alfabética, entendendo números ("São Paulo 2" vem antes de
+  "São Paulo 10").
+- O item personalizado ("+") de cada tipo é fixo no site.
+- Se a publicação falhar (ex: Google fora do ar), o site anterior continua no
+  ar; é só tentar de novo. O motivo aparece em Vercel → Deployments.
+
+### Configurações no código
+
+Em `src/lib/catalog.ts`:
 
 - **Contato da loja:** `WHATSAPP_NUMBER`, `EMAIL_LOJA`.
-- **Envio dos pedidos:** `PLANILHA_ENDPOINT` (Google Sheets) e `FORMSPREE_ENDPOINT` (plano B).
+- **Planilha/Drive:** a URL do Apps Script fica em `src/lib/config.json`
+  (`planilhaEndpoint`). Plano B dos pedidos: `FORMSPREE_ENDPOINT`.
 - **Tipos de produto** (`PRODUCT_TYPES`): são os botões da barra inferior
   (Pins, Canecas, Garrafas). Para um tipo novo, adicione um item com `id`,
   nome, título, subtítulo e um ícone do [lucide](https://lucide.dev/icons).
 - **Temas** (`THEMES`): São Paulo, bandas etc. Quando um tipo de produto tem
   mais de um tema, aparecem filtros no topo da página.
-- **Produtos** (`PRODUCTS`): cada um tem `id` único, `name`, `type`, `theme` e
-  `image`. Um item com `custom: true` é o "personalizado" — o cliente envia a
-  arte no fim do pedido.
-
-### Imagens
-
-Ficam em `public/images/NOME-DO-TEMA/`. Use **WebP quadrado com ~400×400px**
-(fica leve: ~15 KB por imagem). As originais em alta resolução podem ficar em
-`private/`, que não vai para o git nem para o site.
+- **Catálogo fixo** (São Paulo, em `public/images/`): usado só enquanto um
+  tipo de produto ainda não tiver fotos na pasta do Drive.
 
 ---
 
@@ -87,11 +118,21 @@ Faça logado na conta Google da loja (gimimoandco@gmail.com):
    - *Quem pode acessar:* **Qualquer pessoa**
    - Clique em **Implantar** e copie a **URL do app da Web**
      (termina em `/exec`)
-6. Cole a URL em `src/lib/catalog.ts`:
-   ```ts
-   export const PLANILHA_ENDPOINT = 'https://script.google.com/macros/s/XXXX/exec'
+6. Cole a URL em `src/lib/config.json`:
+   ```json
+   { "planilhaEndpoint": "https://script.google.com/macros/s/XXXX/exec" }
    ```
 7. Faça commit/push — a Vercel republica sozinha — e faça um **pedido de teste**
+
+8. **Publicação do catálogo** (botão "Publicar site"):
+   - Na Vercel: **Settings → Git → Deploy Hooks** → nome `Planilha`, branch
+     `main` → **Create Hook** → copie a URL
+   - Na planilha: menu **Gimimo → Configurar publicação…** → cole a URL
+   - Na primeira vez que usar "Publicar site", o Google pede uma permissão a
+     mais (acessar serviço externo) — pode permitir.
+9. Suba as fotos para a pasta **Catálogo Gimimo** no Drive (criada no passo 4;
+   atalho: menu Gimimo → Abrir pasta do catálogo) e clique em
+   **Gimimo → Publicar site**.
 
 **Se alterar o `Code.gs` depois:** Implantar → Gerenciar implantações → lápis →
 *Versão: Nova versão* → Implantar (assim a URL continua a mesma).
@@ -136,6 +177,8 @@ src/
     sendOrder.ts          ← envia o pedido para a planilha
     compressImage.ts      ← reduz as fotos do cliente antes do envio
 apps-script/
-  Code.gs                 ← script da planilha (Google Sheets + Drive)
+  Code.gs                 ← script da planilha (pedidos + catálogo do Drive)
+scripts/
+  sync-catalog.mjs        ← na publicação: baixa e otimiza as fotos do Drive
 public/images/            ← fotos dos produtos e logo
 ```

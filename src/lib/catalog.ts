@@ -2,20 +2,22 @@
 // CATÁLOGO GIMIMO
 // - Tipos de produto (pins, canecas, garrafas…) aparecem na barra inferior.
 // - Cada item pertence a um tipo e a um tema (São Paulo, uma banda…).
-// - As imagens ficam em /public/images/NOME-DO-TEMA/ (de preferência .webp
-//   quadrado com ~400px).
+// - Os produtos vêm da pasta "Catálogo Gimimo" no Google Drive: a cada
+//   publicação, scripts/sync-catalog.mjs gera catalog.generated.json.
+//   Enquanto um tipo não tiver fotos no Drive, vale o catálogo fixo abaixo.
 // =====================================================
 
 import type { LucideIcon } from 'lucide-react'
 import { CircleDot, Coffee, Milk } from 'lucide-react'
+import config from './config.json'
 
 export const WHATSAPP_NUMBER = '5511982204504' // DDI + DDD + número, sem espaços
 export const EMAIL_LOJA = 'gimimoandco@gmail.com'
 
-// URL do Google Apps Script que recebe os pedidos e preenche a planilha do
-// Google Sheets (ver apps-script/Code.gs e o README). Formato:
+// URL do Google Apps Script (planilha de pedidos + catálogo do Drive).
+// Fica em src/lib/config.json → "planilhaEndpoint". Formato:
 // https://script.google.com/macros/s/XXXXXXXX/exec
-export const PLANILHA_ENDPOINT = ''
+export const PLANILHA_ENDPOINT: string = config.planilhaEndpoint
 
 // Plano B, se a planilha não responder: o Formspree (formspree.io) manda o
 // texto do pedido por e-mail para a loja.
@@ -69,8 +71,13 @@ export const PRODUCT_TYPES: ProductType[] = [
   },
 ]
 
-export const THEMES: Theme[] = [{ id: 'sao-paulo', name: 'São Paulo' }]
+// ----- catálogo do Google Drive (gerado na publicação; pode não existir) -----
+type GeneratedProduct = Omit<Product, 'theme'> & { theme: string; themeName: string }
+const generated: GeneratedProduct[] =
+  Object.values(import.meta.glob<GeneratedProduct[]>('./catalog.generated.json', { eager: true, import: 'default' }))[0] ?? []
+const typesFromDrive = new Set(generated.map((p) => p.type))
 
+// ----- catálogo fixo (usado enquanto o tipo não tiver fotos no Drive) -----
 // Números disponíveis na coleção São Paulo (o 79 não existe)
 const SAO_PAULO_NUMBERS = Array.from({ length: 117 }, (_, i) => i + 1).filter((n) => n !== 79)
 
@@ -83,23 +90,37 @@ const customItem = (type: ProductTypeId, name: string): Product => ({
   custom: true,
 })
 
+const STATIC_PRODUCTS: Product[] = SAO_PAULO_NUMBERS.map((n) => {
+  const padded = String(n).padStart(3, '0')
+  return {
+    id: `SP-${padded}`,
+    name: `São Paulo ${String(n).padStart(2, '0')}`,
+    type: 'pins',
+    theme: 'sao-paulo',
+    image: `/images/sao-paulo/${padded}.webp`,
+  }
+})
+const STATIC_THEMES: Theme[] = [{ id: 'sao-paulo', name: 'São Paulo' }]
+
+// Para cada tipo: fotos do Drive, se houver; senão, o catálogo fixo.
+const catalogProducts: Product[] = [
+  ...STATIC_PRODUCTS.filter((p) => !typesFromDrive.has(p.type)),
+  ...generated.map(({ themeName: _, ...p }) => p),
+]
+
+export const THEMES: Theme[] = [
+  ...STATIC_THEMES.filter((t) => catalogProducts.some((p) => p.theme === t.id)),
+  ...[...new Map(generated.map((p) => [p.theme, { id: p.theme, name: p.themeName }])).values()].filter(
+    (t) => !STATIC_THEMES.some((s) => s.id === t.id),
+  ),
+]
+
+// O item personalizado ("+") de cada tipo fica sempre fixo, no começo.
 export const PRODUCTS: Product[] = [
   customItem('pins', 'Pin personalizado'),
-  ...SAO_PAULO_NUMBERS.map((n): Product => {
-    const padded = String(n).padStart(3, '0')
-    return {
-      id: `SP-${padded}`,
-      name: `São Paulo ${String(n).padStart(2, '0')}`,
-      type: 'pins',
-      theme: 'sao-paulo',
-      image: `/images/sao-paulo/${padded}.webp`,
-    }
-  }),
-
-  // Canecas e garrafas: por enquanto só sob encomenda (arte do cliente).
-  // Para adicionar modelos prontos, siga o formato dos pins acima.
   customItem('canecas', 'Caneca personalizada'),
   customItem('garrafas', 'Garrafa personalizada'),
+  ...catalogProducts,
 ]
 
 export const getProductType = (id: string | null) =>

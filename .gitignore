@@ -13,3 +13,7 @@ dev-dist/
 # planilhas internas e imagens originais — não publicar
 private/
 referencia/
+
+# catálogo gerado na publicação (scripts/sync-catalog.mjs)
+public/catalogo/
+src/lib/catalog.generated.json
