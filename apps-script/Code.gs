@@ -22,6 +22,12 @@ const TIPOS_CATALOGO = { Bottons: 'pins', Canecas: 'canecas', Garrafas: 'garrafa
 const AVISAR_POR_EMAIL = true // e-mail de aviso a cada pedido novo
 const STATUS = ['novo', 'orçamento enviado', 'aprovado', 'em produção', 'pronto', 'entregue', 'cancelado']
 
+// Cada pedido vira um arquivo novo (ex: "24.10 Bottons farol"), copiado da aba
+// modelo desta planilha, com a coluna Qtd preenchida. Mantenha a aba modelo
+// com a coluna Qtd vazia. Os arquivos ficam em PASTA_PEDIDOS / ano-mês.
+const ABA_MODELO = 'Planilha1'
+const PASTA_PEDIDOS = 'Gimimo — pedidos'
+
 const COLUNAS = [
   'Data',
   'Pedido',
@@ -35,10 +41,11 @@ const COLUNAS = [
   'Tema',
   'Qtd',
   'Imagens do cliente',
+  'Arquivo do pedido',
   'Status',
   'Observações',
 ]
-const LARGURAS = [130, 150, 160, 200, 130, 260, 70, 180, 90, 110, 50, 150, 130, 220]
+const LARGURAS = [130, 150, 160, 200, 130, 260, 70, 180, 90, 110, 50, 150, 160, 130, 220]
 
 // ===== RECEBE O PEDIDO =====
 function doPost(e) {
@@ -55,6 +62,15 @@ function doPost(e) {
       const linkImagens = salvarImagens(id, pedido)
       const agora = new Date()
 
+      // arquivo do pedido a partir do modelo; se falhar, o pedido não se perde
+      let arquivo = ''
+      try {
+        arquivo = criarArquivoPedido(id, pedido, linkImagens, agora)
+      } catch (err) {
+        console.error(err)
+        arquivo = 'ERRO ao criar arquivo: ' + (err && err.message ? err.message : err)
+      }
+
       const linhas = pedido.itens.map((item) => [
         agora,
         id,
@@ -68,6 +84,7 @@ function doPost(e) {
         texto(item.tema),
         Number(item.qtd) || 0,
         item.personalizado ? linkImagens : '',
+        arquivo,
         STATUS[0],
         texto(pedido.observacoes),
       ])
@@ -76,7 +93,7 @@ function doPost(e) {
       sheet.getRange(inicio, 1, linhas.length, COLUNAS.length).setValues(linhas)
       sheet.setRowHeights(inicio, linhas.length, 48)
 
-      if (AVISAR_POR_EMAIL) avisar(id, pedido, linkImagens)
+      if (AVISAR_POR_EMAIL) avisar(id, pedido, linkImagens, arquivo)
       return json({ ok: true, pedido: id })
     } finally {
       lock.releaseLock()
@@ -84,6 +101,154 @@ function doPost(e) {
   } catch (err) {
     console.error(err)
     return json({ ok: false, error: String(err && err.message ? err.message : err) })
+  }
+}
+
+// ===== ARQUIVO DO PEDIDO (cópia do modelo) =====
+
+// Cria "dd.MM <nome desta planilha>" na pasta do mês, com a aba modelo
+// copiada e preenchida. Devolve o link do arquivo.
+function criarArquivoPedido(id, pedido, linkImagens, agora) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
+  const modelo = ss.getSheetByName(ABA_MODELO) || ss.getSheets().filter((s) => s.getName() !== ABA)[0]
+  if (!modelo) throw new Error('Aba modelo "' + ABA_MODELO + '" não encontrada')
+
+  const tz = Session.getScriptTimeZone() || 'America/Sao_Paulo'
+  const pasta = subpasta(pastaPorNome(PASTA_PEDIDOS), Utilities.formatDate(agora, tz, 'yyyy-MM'))
+  const nome = nomeLivre(pasta, Utilities.formatDate(agora, tz, 'dd.MM') + ' ' + ss.getName())
+
+  // copia só a aba (copiar o arquivo inteiro levaria junto o script e o menu)
+  const novo = SpreadsheetApp.create(nome)
+  const aba = modelo.copyTo(novo).setName('Pedido')
+  novo.getSheets().forEach((s) => {
+    if (s.getSheetId() !== aba.getSheetId()) novo.deleteSheet(s)
+  })
+
+  preencherModelo(aba, pedido, linkImagens)
+  blocoCliente(aba, id, pedido, linkImagens, agora, tz)
+  SpreadsheetApp.flush()
+  DriveApp.getFileById(novo.getId()).moveTo(pasta)
+  return novo.getUrl()
+}
+
+// Preenche a coluna Qtd do modelo. Linha 1 = cabeçalho com "TEMA" e "Qtd";
+// a linha com "TOTAL" marca o fim. Itens que não estão no modelo
+// (personalizado, outros temas) entram nas linhas vazias antes do TOTAL.
+function preencherModelo(aba, pedido, linkImagens) {
+  const dados = aba.getDataRange().getValues()
+  const cab = dados[0].map(normalizar)
+  const colNome = cab.findIndex((c) => c.indexOf('TEMA') !== -1 || c.indexOf('PRODUTO') !== -1)
+  const colQtd = cab.findIndex((c) => c.indexOf('QTD') !== -1 || c.indexOf('QUANT') !== -1)
+  const colImg = cab.findIndex((c) => c.indexOf('IMAGE') !== -1 || c.indexOf('FOTO') !== -1)
+  if (colNome < 0 || colQtd < 0) throw new Error('O modelo precisa das colunas "TEMA" e "Qtd" na linha 1')
+
+  let fim = dados.findIndex((r, i) => i > 0 && r.some((v) => normalizar(v) === 'TOTAL'))
+  if (fim < 0) fim = dados.length // índice (0) da linha TOTAL
+
+  // linha de cada modelo pelo nome ("São Paulo 1" = "SÃO PAULO 01")
+  const linhaDe = {}
+  for (let i = 1; i < fim; i++) {
+    const n = normalizar(dados[i][colNome])
+    if (n && linhaDe[n] === undefined) linhaDe[n] = i
+  }
+
+  const qtd = []
+  for (let i = 1; i < fim; i++) qtd.push([''])
+  const extras = []
+  pedido.itens.forEach((item) => {
+    const i = linhaDe[normalizar(item.nome)]
+    const n = Number(item.qtd) || 0
+    if (i === undefined) extras.push(item)
+    else qtd[i - 1][0] = (Number(qtd[i - 1][0]) || 0) + n
+  })
+  if (qtd.length) aba.getRange(2, colQtd + 1, qtd.length, 1).setValues(qtd)
+
+  if (extras.length) {
+    // linhas vazias depois do último modelo
+    let ultimo = 0
+    for (let i = 1; i < fim; i++) if (normalizar(dados[i][colNome])) ultimo = i
+    const livres = []
+    for (let i = ultimo + 1; i < fim; i++) if (!normalizar(dados[i][colNome])) livres.push(i + 1)
+
+    // faltou linha: cria antes da última linha vazia (ou do TOTAL)
+    const faltam = extras.length - livres.length
+    if (faltam > 0) {
+      const antes = livres.length ? livres[livres.length - 1] : fim + 1
+      aba.insertRowsBefore(antes, faltam)
+      for (let k = 0; k < faltam; k++) livres.push(livres.length ? livres[livres.length - 1] + 1 : antes + k)
+      livres.sort((a, b) => a - b)
+    }
+
+    const altura = aba.getRowHeight(2)
+    extras.forEach((item, k) => {
+      const r = livres[k]
+      const nome = item.tema && !item.personalizado ? item.nome + ' (' + item.tema + ')' : item.nome
+      aba.getRange(r, colNome + 1).setValue(texto(nome.toUpperCase()))
+      aba.getRange(r, colQtd + 1).setValue(Number(item.qtd) || 0)
+      if (colImg >= 0) {
+        const celula = aba.getRange(r, colImg + 1)
+        if (item.personalizado && linkImagens) celula.setFormula('=HYPERLINK("' + linkImagens + '","ver imagens do cliente")')
+        else if (item.personalizado) celula.setValue('imagens: pedir ao cliente')
+        else if (formulaImagem(item.imagem)) celula.setFormula(formulaImagem(item.imagem))
+      }
+      aba.setRowHeight(r, altura)
+    })
+  }
+
+  // TOTAL soma tudo, inclusive linhas novas
+  const total = aba.createTextFinder('TOTAL').matchEntireCell(true).findNext()
+  if (total) {
+    const linhaTotal = total.getRow()
+    const letra = aba.getRange(1, colQtd + 1).getA1Notation().replace(/\d+/g, '')
+    aba.getRange(linhaTotal, colQtd + 1).setFormula('=SUM(' + letra + '2:' + letra + (linhaTotal - 1) + ')')
+  }
+}
+
+// Dados do cliente ao lado da tabela
+function blocoCliente(aba, id, pedido, linkImagens, agora, tz) {
+  const col = aba.getLastColumn() + 2
+  const linhas = [
+    ['Pedido', id],
+    ['Data', Utilities.formatDate(agora, tz, 'dd/MM/yyyy HH:mm')],
+    ['Cliente', texto(pedido.nome)],
+    ['E-mail', texto(pedido.email)],
+    ['Telefone', texto(pedido.telefone)],
+    ['Entrega', texto(pedido.entrega)],
+    ['Imagens do cliente', linkImagens || '—'],
+  ]
+  aba.getRange(1, col, linhas.length, 2).setValues(linhas).setVerticalAlignment('middle')
+  aba.getRange(1, col, linhas.length, 1).setFontWeight('bold')
+  aba.getRange(1, col + 1, linhas.length, 1).setWrap(true)
+  aba.setColumnWidth(col, 130)
+  aba.setColumnWidth(col + 1, 300)
+}
+
+function normalizar(v) {
+  return String(v == null ? '' : v)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/\b0+(\d)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function pastaPorNome(nome) {
+  const pastas = DriveApp.getFoldersByName(nome)
+  return pastas.hasNext() ? pastas.next() : DriveApp.createFolder(nome)
+}
+
+function subpasta(pai, nome) {
+  const pastas = pai.getFoldersByName(nome)
+  return pastas.hasNext() ? pastas.next() : pai.createFolder(nome)
+}
+
+// "24.10 Bottons farol", ou "(2)", "(3)"… se já existir no mesmo dia
+function nomeLivre(pasta, base) {
+  if (!pasta.getFilesByName(base).hasNext()) return base
+  for (let n = 2; ; n++) {
+    const nome = base + ' (' + n + ')'
+    if (!pasta.getFilesByName(nome).hasNext()) return nome
   }
 }
 
@@ -218,19 +383,9 @@ function configurarPublicacao() {
 
 // ===== EXECUTE UMA VEZ, para criar o cabeçalho e pedir as permissões =====
 function configurar() {
-  const sheet = obterAba()
-  sheet.getRange(1, 1, 1, COLUNAS.length).setValues([COLUNAS]).setFontWeight('bold').setBackground('#F7F4EF')
-  sheet.setFrozenRows(1)
-  LARGURAS.forEach((w, i) => sheet.setColumnWidth(i + 1, w))
-
-  const col = (nome) => COLUNAS.indexOf(nome) + 1
-  sheet.getRange(2, col('Data'), sheet.getMaxRows() - 1, 1).setNumberFormat('dd/mm/yyyy hh:mm')
-
-  // lista de status para escolher em cada linha
-  const regra = SpreadsheetApp.newDataValidation().requireValueInList(STATUS, true).build()
-  sheet.getRange(2, col('Status'), sheet.getMaxRows() - 1, 1).setDataValidation(regra)
-
+  cabecalho(obterAba())
   pastaPrincipal() // pasta das imagens dos pedidos
+  pastaPorNome(PASTA_PEDIDOS) // pasta dos arquivos de cada pedido
 
   // pasta do catálogo com uma subpasta por tipo de produto
   const catalogo = pastaCatalogo()
@@ -262,9 +417,25 @@ function validar(p) {
   if (p.imagens && p.imagens.length > 20) throw new Error('Imagens demais')
 }
 
+// aba "Pedidos" (índice de todos os pedidos); recriada com cabeçalho se apagada
 function obterAba() {
   const ss = SpreadsheetApp.getActiveSpreadsheet()
-  return ss.getSheetByName(ABA) || ss.insertSheet(ABA)
+  const sheet = ss.getSheetByName(ABA) || ss.insertSheet(ABA)
+  if (sheet.getLastRow() === 0) cabecalho(sheet)
+  return sheet
+}
+
+function cabecalho(sheet) {
+  sheet.getRange(1, 1, 1, COLUNAS.length).setValues([COLUNAS]).setFontWeight('bold').setBackground('#F7F4EF')
+  sheet.setFrozenRows(1)
+  LARGURAS.forEach((w, i) => sheet.setColumnWidth(i + 1, w))
+
+  const col = (nome) => COLUNAS.indexOf(nome) + 1
+  sheet.getRange(2, col('Data'), sheet.getMaxRows() - 1, 1).setNumberFormat('dd/mm/yyyy hh:mm')
+
+  // lista de status para escolher em cada linha
+  const regra = SpreadsheetApp.newDataValidation().requireValueInList(STATUS, true).build()
+  sheet.getRange(2, col('Status'), sheet.getMaxRows() - 1, 1).setDataValidation(regra)
 }
 
 function gerarId() {
@@ -292,7 +463,7 @@ function salvarImagens(id, pedido) {
   return pasta.getUrl()
 }
 
-function avisar(id, pedido, linkImagens) {
+function avisar(id, pedido, linkImagens, arquivo) {
   const total = pedido.itens.reduce((s, i) => s + (Number(i.qtd) || 0), 0)
   const itens = pedido.itens.map((i) => '• ' + i.nome + ' — ' + i.qtd + ' un.').join('\n')
   const corpo = [
@@ -309,7 +480,8 @@ function avisar(id, pedido, linkImagens) {
     linkImagens ? '\nImagens do cliente: ' + linkImagens : null,
     pedido.imagensNaoEnviadas ? '\n(' + pedido.imagensNaoEnviadas + ' imagem(ns) não couberam — pedir ao cliente)' : null,
     '',
-    'Planilha: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl(),
+    arquivo ? 'Arquivo do pedido: ' + arquivo : null,
+    'Índice de pedidos: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl(),
   ]
     .filter((l) => l !== null)
     .join('\n')
