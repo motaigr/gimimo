@@ -27,10 +27,10 @@ Abre em http://localhost:5173
 
 ## Como adicionar bottons e outros produtos (sem mexer no código)
 
-Os produtos vêm da pasta **"Catálogo Gimimo"** no Google Drive da loja:
+Os produtos vêm da pasta **"Catálogo"** no Google Drive da loja:
 
 ```
-Catálogo Gimimo/
+Catálogo/
   Bottons/
     São Paulo/
       São Paulo 01.jpg
@@ -89,7 +89,7 @@ cai direto numa planilha do Google Sheets da loja:
   quantidade, link das imagens do cliente, **status** (lista para escolher:
   novo, orçamento enviado, aprovado, em produção…) e observações;
 - as **imagens do item personalizado** vão para uma pasta no Google Drive
-  ("Gimimo — imagens dos pedidos", uma subpasta por pedido);
+  ("Pedidos/Imagens dos clientes", uma subpasta por pedido);
 - chega um **e-mail de aviso** para a dona da planilha a cada pedido novo.
 
 Para baixar como Excel: *Arquivo → Fazer download → Microsoft Excel (.xlsx)*
@@ -130,7 +130,7 @@ Faça logado na conta Google da loja (gimimoandco@gmail.com):
    - Na planilha: menu **Gimimo → Configurar publicação…** → cole a URL
    - Na primeira vez que usar "Publicar site", o Google pede uma permissão a
      mais (acessar serviço externo) — pode permitir.
-9. Suba as fotos para a pasta **Catálogo Gimimo** no Drive (criada no passo 4;
+9. Suba as fotos para a pasta **Catálogo** no Drive (criada no passo 4;
    atalho: menu Gimimo → Abrir pasta do catálogo) e clique em
    **Gimimo → Publicar site**.
 

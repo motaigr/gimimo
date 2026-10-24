@@ -6,8 +6,8 @@
  * (uma pasta por pedido) e o link fica na planilha. A cada pedido novo, chega
  * um e-mail de aviso para a dona da planilha.
  *
- * CATÁLOGO: os produtos do site vêm da pasta "Catálogo Gimimo" no Drive
- * (Catálogo Gimimo / Bottons / São Paulo / foto.jpg). Depois de adicionar
+ * CATÁLOGO: os produtos do site vêm da pasta "Catálogo" no Drive
+ * (Catálogo / Bottons / São Paulo / foto.jpg). Depois de adicionar
  * fotos, use o menu Gimimo → Publicar site.
  *
  * Instalação: veja o README do projeto (seção "Pedidos no Google Sheets").
@@ -15,8 +15,20 @@
 
 // ===== CONFIGURAÇÃO =====
 const ABA = 'Pedidos'
-const PASTA_DRIVE = 'Gimimo — imagens dos pedidos'
-const PASTA_CATALOGO = 'Catálogo Gimimo'
+
+// Pastas no Drive, todas dentro da pasta desta planilha (ex: "site gimimo"):
+//   Pedidos/ano-mês/<arquivo de cada pedido>
+//   Pedidos/Imagens dos clientes/<uma pasta por pedido>
+//   Catálogo/Bottons|Canecas|Garrafas/<tema>/<fotos>
+const PASTA_PEDIDOS = 'Pedidos'
+const PASTA_IMAGENS = 'Imagens dos clientes'
+const PASTA_CATALOGO = 'Catálogo'
+// nomes usados em versões anteriores: a pasta é renomeada e movida sozinha
+const NOMES_ANTIGOS = {
+  Pedidos: ['Gimimo — pedidos'],
+  'Imagens dos clientes': ['Gimimo — imagens dos pedidos'],
+  Catálogo: ['Catálogo Gimimo'],
+}
 // pastas de primeiro nível do catálogo → tipo de produto no site
 const TIPOS_CATALOGO = { Bottons: 'pins', Canecas: 'canecas', Garrafas: 'garrafas' }
 const AVISAR_POR_EMAIL = true // e-mail de aviso a cada pedido novo
@@ -24,9 +36,8 @@ const STATUS = ['novo', 'orçamento enviado', 'aprovado', 'em produção', 'pron
 
 // Cada pedido vira um arquivo novo (ex: "24.10 Bottons farol"), copiado da aba
 // modelo desta planilha, com a coluna Qtd preenchida. Mantenha a aba modelo
-// com a coluna Qtd vazia. Os arquivos ficam em PASTA_PEDIDOS / ano-mês.
+// com a coluna Qtd vazia. Os arquivos ficam em Pedidos / ano-mês.
 const ABA_MODELO = 'Planilha1'
-const PASTA_PEDIDOS = 'Gimimo — pedidos'
 
 const COLUNAS = [
   'Data',
@@ -240,24 +251,33 @@ function pastaBase() {
   return pais.hasNext() ? pais.next() : DriveApp.getRootFolder()
 }
 
-// Acha (ou cria) a pasta dentro da pasta base. Se ela tiver sido criada antes
-// em outro lugar do Drive, é movida para cá com tudo o que tem dentro.
-function pastaPorNome(nome) {
-  const base = pastaBase()
-  const aqui = base.getFoldersByName(nome)
-  while (aqui.hasNext()) {
-    const f = aqui.next()
-    if (!f.isTrashed()) return f
-  }
-  const outras = DriveApp.getFoldersByName(nome)
-  while (outras.hasNext()) {
-    const f = outras.next()
-    if (!f.isTrashed()) {
-      f.moveTo(base)
-      return f
+// Acha (ou cria) a pasta `nome` dentro de `pai` (padrão: a pasta da planilha).
+// Pasta de versão anterior (NOMES_ANTIGOS) é renomeada e movida para cá com
+// tudo dentro. O nome novo só é procurado dentro de `pai`, para nunca mexer
+// numa pasta "Pedidos" de outro lugar do Drive.
+function pastaPorNome(nome, pai) {
+  pai = pai || pastaBase()
+  const atual = naoLixeira(pai.getFoldersByName(nome))
+  if (atual) return atual
+
+  const antigos = NOMES_ANTIGOS[nome] || []
+  for (let i = 0; i < antigos.length; i++) {
+    const velha = naoLixeira(pai.getFoldersByName(antigos[i])) || naoLixeira(DriveApp.getFoldersByName(antigos[i]))
+    if (velha) {
+      velha.setName(nome)
+      velha.moveTo(pai)
+      return velha
     }
   }
-  return base.createFolder(nome)
+  return pai.createFolder(nome)
+}
+
+function naoLixeira(pastas) {
+  while (pastas.hasNext()) {
+    const f = pastas.next()
+    if (!f.isTrashed()) return f
+  }
+  return null
 }
 
 function subpasta(pai, nome) {
@@ -289,7 +309,7 @@ function doGet(e) {
 
 // ===== CATÁLOGO (pasta no Drive) =====
 
-// Lista as fotos: Catálogo Gimimo / <Tipo> / <Tema> / <foto>. Arquivos ou
+// Lista as fotos: Catálogo / <Tipo> / <Tema> / <foto>. Arquivos ou
 // pastas que começam com "_" ficam ocultos (para tirar do site sem apagar).
 function lerCatalogo() {
   const raiz = pastaCatalogo()
@@ -382,7 +402,7 @@ function abrirCatalogo() {
   const html = HtmlService.createHtmlOutput(
     '<p style="font-family:sans-serif">Pasta do catálogo:<br><a href="' + url + '" target="_blank">' + url + '</a></p>',
   ).setHeight(90)
-  SpreadsheetApp.getUi().showModalDialog(html, 'Catálogo Gimimo')
+  SpreadsheetApp.getUi().showModalDialog(html, 'Catálogo')
 }
 
 function configurarPublicacao() {
@@ -405,8 +425,8 @@ function configurarPublicacao() {
 // ===== EXECUTE UMA VEZ, para criar o cabeçalho e pedir as permissões =====
 function configurar() {
   cabecalho(obterAba())
-  pastaPrincipal() // pasta das imagens dos pedidos
-  pastaPorNome(PASTA_PEDIDOS) // pasta dos arquivos de cada pedido
+  pastaPorNome(PASTA_PEDIDOS) // arquivos de cada pedido, por mês
+  pastaPrincipal() // Pedidos / Imagens dos clientes
 
   // pasta do catálogo com uma subpasta por tipo de produto
   const catalogo = pastaCatalogo()
@@ -466,8 +486,9 @@ function gerarId() {
   return 'GM-' + data + '-' + sufixo
 }
 
+// Pedidos / Imagens dos clientes
 function pastaPrincipal() {
-  return pastaPorNome(PASTA_DRIVE)
+  return pastaPorNome(PASTA_IMAGENS, pastaPorNome(PASTA_PEDIDOS))
 }
 
 // salva as imagens do cliente numa pasta do pedido e devolve o link
