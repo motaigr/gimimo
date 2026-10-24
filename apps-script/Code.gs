@@ -233,9 +233,31 @@ function normalizar(v) {
     .trim()
 }
 
+// Pasta onde está esta planilha (ex: "site gimimo"): as pastas do site ficam
+// todas dentro dela.
+function pastaBase() {
+  const pais = DriveApp.getFileById(SpreadsheetApp.getActiveSpreadsheet().getId()).getParents()
+  return pais.hasNext() ? pais.next() : DriveApp.getRootFolder()
+}
+
+// Acha (ou cria) a pasta dentro da pasta base. Se ela tiver sido criada antes
+// em outro lugar do Drive, é movida para cá com tudo o que tem dentro.
 function pastaPorNome(nome) {
-  const pastas = DriveApp.getFoldersByName(nome)
-  return pastas.hasNext() ? pastas.next() : DriveApp.createFolder(nome)
+  const base = pastaBase()
+  const aqui = base.getFoldersByName(nome)
+  while (aqui.hasNext()) {
+    const f = aqui.next()
+    if (!f.isTrashed()) return f
+  }
+  const outras = DriveApp.getFoldersByName(nome)
+  while (outras.hasNext()) {
+    const f = outras.next()
+    if (!f.isTrashed()) {
+      f.moveTo(base)
+      return f
+    }
+  }
+  return base.createFolder(nome)
 }
 
 function subpasta(pai, nome) {
@@ -320,8 +342,7 @@ function oculto(nome) {
 }
 
 function pastaCatalogo() {
-  const pastas = DriveApp.getFoldersByName(PASTA_CATALOGO)
-  return pastas.hasNext() ? pastas.next() : DriveApp.createFolder(PASTA_CATALOGO)
+  return pastaPorNome(PASTA_CATALOGO)
 }
 
 // ===== MENU "Gimimo" NA PLANILHA =====
@@ -446,8 +467,7 @@ function gerarId() {
 }
 
 function pastaPrincipal() {
-  const pastas = DriveApp.getFoldersByName(PASTA_DRIVE)
-  return pastas.hasNext() ? pastas.next() : DriveApp.createFolder(PASTA_DRIVE)
+  return pastaPorNome(PASTA_DRIVE)
 }
 
 // salva as imagens do cliente numa pasta do pedido e devolve o link
