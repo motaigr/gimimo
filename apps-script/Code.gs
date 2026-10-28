@@ -434,8 +434,14 @@ function configurar() {
     if (!catalogo.getFoldersByName(nome).hasNext()) catalogo.createFolder(nome)
   })
 
-  onOpen() // mostra o menu Gimimo
-  SpreadsheetApp.getUi().alert('Pronto! Agora publique: Implantar → Nova implantação → App da Web.')
+  // menu e aviso só funcionam com a planilha aberta no navegador; sem ela, a
+  // configuração acima já foi feita e o menu aparece na próxima vez que abrir
+  try {
+    onOpen()
+    SpreadsheetApp.getUi().alert('Pronto! Agora publique: Implantar → Nova implantação → App da Web.')
+  } catch (e) {
+    console.log('Configuração concluída (planilha fechada: o menu aparece ao abri-la).')
+  }
 }
 
 // ===== AUXILIARES =====
