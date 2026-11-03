@@ -398,35 +398,83 @@ function publicarSite() {
 }
 
 // ===== ARRUMAR FOTOS DE BOTTONS FORA DO LUGAR (rodar pelo editor) =====
-// Procura, na pasta de origem, fotos de bottons de São Paulo e leva para
+// Procura fotos de bottons de São Paulo fora do lugar e leva para
 // Catálogo / Bottons / São Paulo com o nome padrão "São Paulo NN":
 //   "001.webp" … "117.webp"          → "São Paulo 01.webp" … "São Paulo 117.webp"
 //   "SÃO PAULO 79.png", "sao paulo 5" → "São Paulo 79.png", "São Paulo 05"
-// Qualquer outro arquivo (imagens de clientes, pastas de pedidos) fica onde está.
+// Onde procura: dentro da pasta da planilha (todas as subpastas), em qualquer
+// pasta "São Paulo" do Drive e em imagens com "Paulo" no nome. Nunca mexe em
+// pastas de pedidos ("GM-…") nem em arquivos com outros nomes.
 // Se já existir uma foto com o mesmo nome no destino, não mexe nessa.
+// No fim, mostra no registro como está organizada a pasta da planilha.
 function arrumarFotosSaoPaulo() {
-  const origem = pastaPrincipal() // Pedidos / Imagens dos clientes
   const bottons = subpasta(pastaCatalogo(), 'Bottons')
   const destino = subpasta(bottons, 'São Paulo')
+  const destinoId = destino.getId()
+
+  const padrao = (nome) =>
+    nome.match(/^(\d{1,3})\.(webp|png|jpe?g)$/i) || nome.match(/^s[ãa]o paulo\s*(\d{1,3})\.(webp|png|jpe?g)$/i)
+
+  // candidatos: { arquivo, origem } sem repetir
+  const vistos = {}
+  const candidatos = []
+  const considerar = (f, origem) => {
+    if (vistos[f.getId()] || f.getMimeType().indexOf('image/') !== 0 || !padrao(f.getName())) return
+    const pai = f.getParents()
+    const p = pai.hasNext() ? pai.next() : null
+    if (p && (p.getId() === destinoId || /^GM-/.test(p.getName()))) return
+    vistos[f.getId()] = true
+    candidatos.push({ arquivo: f, origem: origem })
+  }
+  const varrer = (pasta, caminho, nivel) => {
+    if (nivel > 6 || pasta.getId() === destinoId || /^GM-/.test(pasta.getName()) || pasta.isTrashed()) return
+    const fs = pasta.getFiles()
+    while (fs.hasNext()) considerar(fs.next(), caminho)
+    const ps = pasta.getFolders()
+    while (ps.hasNext()) {
+      const sub = ps.next()
+      varrer(sub, caminho + ' / ' + sub.getName(), nivel + 1)
+    }
+  }
+
+  const base = pastaBase()
+  varrer(base, base.getName(), 0)
+  // pastas "São Paulo" em outros lugares do Drive: só se quase todas as
+  // imagens dela tiverem nome de botton (para não mexer em pasta pessoal)
+  const pastasSP = DriveApp.getFoldersByName('São Paulo')
+  while (pastasSP.hasNext()) {
+    const p = pastasSP.next()
+    let imagens = 0
+    let dePadrao = 0
+    const fs = p.getFiles()
+    while (fs.hasNext()) {
+      const f = fs.next()
+      if (f.getMimeType().indexOf('image/') !== 0) continue
+      imagens++
+      if (padrao(f.getName())) dePadrao++
+    }
+    if (imagens && dePadrao / imagens >= 0.8) varrer(p, 'pasta "São Paulo" (' + p.getUrl() + ')', 0)
+    else if (imagens) console.log('Ignorada (não parece pasta de bottons): ' + p.getUrl())
+  }
+  const busca = DriveApp.searchFiles("trashed = false and mimeType contains 'image/' and title contains 'paulo'")
+  while (busca.hasNext()) considerar(busca.next(), 'busca no Drive')
 
   const movidas = []
   const repetidas = []
-  const arquivos = origem.getFiles()
-  while (arquivos.hasNext()) {
-    const f = arquivos.next()
-    const nome = f.getName()
-    const m = nome.match(/^(\d{1,3})\.(webp|png|jpe?g)$/i) || nome.match(/^s[ãa]o paulo\s*(\d{1,3})\.(webp|png|jpe?g)$/i)
-    if (!m || f.getMimeType().indexOf('image/') !== 0) continue
-
+  const origens = {}
+  candidatos.forEach((c) => {
+    const m = padrao(c.arquivo.getName())
     const novo = 'São Paulo ' + String(Number(m[1])).padStart(2, '0') + '.' + m[2].toLowerCase()
     if (destino.getFilesByName(novo).hasNext()) {
-      repetidas.push(nome)
-      continue
+      repetidas.push(c.arquivo.getName())
+      return
     }
-    f.setName(novo)
-    f.moveTo(destino)
+    c.arquivo.setName(novo)
+    c.arquivo.moveTo(destino)
     movidas.push(novo)
-  }
+    origens[c.origem] = (origens[c.origem] || 0) + 1
+  })
+  Object.keys(origens).forEach((o) => console.log('Movidas de "' + o + '": ' + origens[o]))
 
   // o que ficou faltando de 1 a 121, para conferir
   const tem = {}
@@ -444,11 +492,38 @@ function arrumarFotosSaoPaulo() {
     'Agora a pasta São Paulo tem ' + Object.keys(tem).length + ' bottons numerados.' +
     (faltam.length ? '\nFaltam (de 1 a 121): ' + faltam.join(', ') : '\nEstão todos, de 1 a 121.')
   console.log(resumo)
+  mostrarPastas()
   try {
     SpreadsheetApp.getUi().alert(resumo)
   } catch (e) {
     /* planilha fechada: o resumo fica no registro de execução */
   }
+}
+
+// Escreve no registro de execução a árvore da pasta da planilha (pastas e
+// quantos arquivos cada uma tem). Pastas de pedidos "GM-…" só são contadas.
+function mostrarPastas() {
+  const linhas = []
+  const contarPedidos = { n: 0 }
+  const varrer = (pasta, nivel) => {
+    if (/^GM-/.test(pasta.getName())) {
+      contarPedidos.n++
+      return
+    }
+    let n = 0
+    const exemplos = []
+    const fs = pasta.getFiles()
+    while (fs.hasNext()) {
+      const f = fs.next()
+      if (n < 3) exemplos.push(f.getName())
+      n++
+    }
+    linhas.push('  '.repeat(nivel) + pasta.getName() + '/  (' + n + ' arquivo(s)' + (exemplos.length ? ': ' + exemplos.join(', ') + (n > 3 ? '…' : '') : '') + ')')
+    const ps = pasta.getFolders()
+    while (ps.hasNext()) varrer(ps.next(), nivel + 1)
+  }
+  varrer(pastaBase(), 0)
+  console.log('Como está a pasta:\n' + linhas.join('\n') + (contarPedidos.n ? '\n(' + contarPedidos.n + ' pasta(s) de pedidos "GM-…" não listadas)' : ''))
 }
 
 function abrirCatalogo() {
