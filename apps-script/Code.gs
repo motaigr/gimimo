@@ -397,6 +397,60 @@ function publicarSite() {
   )
 }
 
+// ===== ARRUMAR FOTOS DE BOTTONS FORA DO LUGAR (rodar pelo editor) =====
+// Procura, na pasta de origem, fotos de bottons de São Paulo e leva para
+// Catálogo / Bottons / São Paulo com o nome padrão "São Paulo NN":
+//   "001.webp" … "117.webp"          → "São Paulo 01.webp" … "São Paulo 117.webp"
+//   "SÃO PAULO 79.png", "sao paulo 5" → "São Paulo 79.png", "São Paulo 05"
+// Qualquer outro arquivo (imagens de clientes, pastas de pedidos) fica onde está.
+// Se já existir uma foto com o mesmo nome no destino, não mexe nessa.
+function arrumarFotosSaoPaulo() {
+  const origem = pastaPrincipal() // Pedidos / Imagens dos clientes
+  const bottons = subpasta(pastaCatalogo(), 'Bottons')
+  const destino = subpasta(bottons, 'São Paulo')
+
+  const movidas = []
+  const repetidas = []
+  const arquivos = origem.getFiles()
+  while (arquivos.hasNext()) {
+    const f = arquivos.next()
+    const nome = f.getName()
+    const m = nome.match(/^(\d{1,3})\.(webp|png|jpe?g)$/i) || nome.match(/^s[ãa]o paulo\s*(\d{1,3})\.(webp|png|jpe?g)$/i)
+    if (!m || f.getMimeType().indexOf('image/') !== 0) continue
+
+    const novo = 'São Paulo ' + String(Number(m[1])).padStart(2, '0') + '.' + m[2].toLowerCase()
+    if (destino.getFilesByName(novo).hasNext()) {
+      repetidas.push(nome)
+      continue
+    }
+    f.setName(novo)
+    f.moveTo(destino)
+    movidas.push(novo)
+  }
+
+  // o que ficou faltando de 1 a 121, para conferir
+  const tem = {}
+  const todas = destino.getFiles()
+  while (todas.hasNext()) {
+    const m = todas.next().getName().match(/(\d+)\.[a-z]+$/i)
+    if (m) tem[Number(m[1])] = true
+  }
+  const faltam = []
+  for (let n = 1; n <= 121; n++) if (!tem[n]) faltam.push(n)
+
+  const resumo =
+    movidas.length + ' foto(s) movidas para Catálogo / Bottons / São Paulo.\n' +
+    (repetidas.length ? repetidas.length + ' já existiam lá e ficaram na pasta de origem: ' + repetidas.join(', ') + '\n' : '') +
+    'Agora a pasta São Paulo tem ' + Object.keys(tem).length + ' bottons numerados.' +
+    (faltam.length ? '\nFaltam (de 1 a 121): ' + faltam.join(', ') : '\nEstão todos, de 1 a 121.')
+  console.log(resumo)
+  try {
+    SpreadsheetApp.getUi().alert(resumo)
+  } catch (e) {
+    /* planilha fechada: o resumo fica no registro de execução */
+  }
+}
+
 function abrirCatalogo() {
   const url = pastaCatalogo().getUrl()
   const html = HtmlService.createHtmlOutput(
