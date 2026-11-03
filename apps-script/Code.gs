@@ -412,8 +412,10 @@ function arrumarFotosSaoPaulo() {
   const destino = subpasta(bottons, 'São Paulo')
   const destinoId = destino.getId()
 
+  // "006.webp", "Cópia de 006.webp", "006 (1).webp", "SÃO PAULO 79.png"…
   const padrao = (nome) =>
-    nome.match(/^(\d{1,3})\.(webp|png|jpe?g)$/i) || nome.match(/^s[ãa]o paulo\s*(\d{1,3})\.(webp|png|jpe?g)$/i)
+    nome.match(/^(?:c[óo]pia de\s+)?(\d{1,3})(?:\s*\(\d+\))?\.(webp|png|jpe?g)$/i) ||
+    nome.match(/^(?:c[óo]pia de\s+)?s[ãa]o paulo\s*(\d{1,3})(?:\s*\(\d+\))?\.(webp|png|jpe?g)$/i)
 
   // candidatos: { arquivo, origem } sem repetir
   const vistos = {}
@@ -426,10 +428,14 @@ function arrumarFotosSaoPaulo() {
     vistos[f.getId()] = true
     candidatos.push({ arquivo: f, origem: origem })
   }
+  // varre pastas e subpastas; na própria pasta de destino só olha as
+  // subpastas (ex: São Paulo / Imagens dos clientes)
   const varrer = (pasta, caminho, nivel) => {
-    if (nivel > 6 || pasta.getId() === destinoId || /^GM-/.test(pasta.getName()) || pasta.isTrashed()) return
-    const fs = pasta.getFiles()
-    while (fs.hasNext()) considerar(fs.next(), caminho)
+    if (nivel > 6 || /^GM-/.test(pasta.getName()) || pasta.isTrashed()) return
+    if (pasta.getId() !== destinoId) {
+      const fs = pasta.getFiles()
+      while (fs.hasNext()) considerar(fs.next(), caminho)
+    }
     const ps = pasta.getFolders()
     while (ps.hasNext()) {
       const sub = ps.next()
@@ -459,38 +465,54 @@ function arrumarFotosSaoPaulo() {
   const busca = DriveApp.searchFiles("trashed = false and mimeType contains 'image/' and title contains 'paulo'")
   while (busca.hasNext()) considerar(busca.next(), 'busca no Drive')
 
+  // números que já estão no destino (uma foto por número, qualquer extensão)
+  const numeroDe = (nome) => {
+    const m = nome.match(/(\d+)(?:\s*\(\d+\))?\.[a-z]+$/i)
+    return m ? Number(m[1]) : null
+  }
+  const tem = {}
+  const jaLa = destino.getFiles()
+  while (jaLa.hasNext()) {
+    const n = numeroDe(jaLa.next().getName())
+    if (n !== null) tem[n] = true
+  }
+
   const movidas = []
-  const repetidas = []
+  let repetidas = 0
   const origens = {}
   candidatos.forEach((c) => {
     const m = padrao(c.arquivo.getName())
-    const novo = 'São Paulo ' + String(Number(m[1])).padStart(2, '0') + '.' + m[2].toLowerCase()
-    if (destino.getFilesByName(novo).hasNext()) {
-      repetidas.push(c.arquivo.getName())
+    const n = Number(m[1])
+    if (tem[n]) {
+      repetidas++ // já tem esse número: a cópia fica onde está
       return
     }
+    const novo = 'São Paulo ' + String(n).padStart(2, '0') + '.' + m[2].toLowerCase()
     c.arquivo.setName(novo)
     c.arquivo.moveTo(destino)
+    tem[n] = true
     movidas.push(novo)
     origens[c.origem] = (origens[c.origem] || 0) + 1
   })
   Object.keys(origens).forEach((o) => console.log('Movidas de "' + o + '": ' + origens[o]))
 
-  // o que ficou faltando de 1 a 121, para conferir
-  const tem = {}
-  const todas = destino.getFiles()
-  while (todas.hasNext()) {
-    const m = todas.next().getName().match(/(\d+)\.[a-z]+$/i)
-    if (m) tem[Number(m[1])] = true
-  }
+  // conferência: o que falta de 1 a 121 e o que está lá fora desse intervalo
   const faltam = []
   for (let n = 1; n <= 121; n++) if (!tem[n]) faltam.push(n)
+  const estranhos = []
+  const todas = destino.getFiles()
+  while (todas.hasNext()) {
+    const nome = todas.next().getName()
+    const n = numeroDe(nome)
+    if (n === null || n < 1 || n > 121) estranhos.push(nome)
+  }
 
   const resumo =
     movidas.length + ' foto(s) movidas para Catálogo / Bottons / São Paulo.\n' +
-    (repetidas.length ? repetidas.length + ' já existiam lá e ficaram na pasta de origem: ' + repetidas.join(', ') + '\n' : '') +
-    'Agora a pasta São Paulo tem ' + Object.keys(tem).length + ' bottons numerados.' +
-    (faltam.length ? '\nFaltam (de 1 a 121): ' + faltam.join(', ') : '\nEstão todos, de 1 a 121.')
+    (repetidas ? repetidas + ' cópia(s) repetida(s) ficaram onde estavam (já havia foto com o mesmo número).\n' : '') +
+    'Faixa 1–121: ' + (121 - faltam.length) + ' de 121.' +
+    (faltam.length ? '\nFaltam: ' + faltam.join(', ') : ' Estão todos!') +
+    (estranhos.length ? '\nNa pasta São Paulo, fora de 1–121 (conferir): ' + estranhos.join(', ') : '')
   console.log(resumo)
   mostrarPastas()
   try {
