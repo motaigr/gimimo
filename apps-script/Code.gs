@@ -30,7 +30,14 @@ const NOMES_ANTIGOS = {
   Catálogo: ['Catálogo Gimimo'],
 }
 // pastas de primeiro nível do catálogo → tipo de produto no site
-const TIPOS_CATALOGO = { Bottons: 'pins', Canecas: 'canecas', Garrafas: 'garrafas' }
+const TIPOS_CATALOGO = { Bottons: 'pins', Canecas: 'canecas', Garrafas: 'garrafas', 'Chaveiros e Ímãs': 'chaveiros' }
+
+// tipo pelo nome da pasta, sem ligar para acento/maiúsculas ("Chaveiros e Imãs" também vale)
+function tipoDaPasta(nome) {
+  const alvo = normalizar(nome)
+  const chave = Object.keys(TIPOS_CATALOGO).filter((k) => normalizar(k) === alvo)[0]
+  return chave ? TIPOS_CATALOGO[chave] : null
+}
 const AVISAR_POR_EMAIL = true // e-mail de aviso a cada pedido novo
 const STATUS = ['novo', 'orçamento enviado', 'aprovado', 'em produção', 'pronto', 'entregue', 'cancelado']
 
@@ -90,7 +97,7 @@ function doPost(e) {
         texto(pedido.telefone),
         texto(pedido.entrega),
         formulaImagem(item.imagem),
-        texto(item.nome),
+        texto(item.preco ? item.nome + ' (' + item.preco + ')' : item.nome),
         texto(item.tipo),
         texto(item.tema),
         Number(item.qtd) || 0,
@@ -193,7 +200,8 @@ function preencherModelo(aba, pedido, linkImagens) {
     const altura = aba.getRowHeight(2)
     extras.forEach((item, k) => {
       const r = livres[k]
-      const nome = item.tema && !item.personalizado ? item.nome + ' (' + item.tema + ')' : item.nome
+      let nome = item.tema && !item.personalizado ? item.nome + ' (' + item.tema + ')' : item.nome
+      if (item.preco) nome += ' — ' + item.preco
       aba.getRange(r, colNome + 1).setValue(texto(nome.toUpperCase()))
       aba.getRange(r, colQtd + 1).setValue(Number(item.qtd) || 0)
       if (colImg >= 0) {
@@ -317,7 +325,7 @@ function lerCatalogo() {
   const tipos = raiz.getFolders()
   while (tipos.hasNext()) {
     const pastaTipo = tipos.next()
-    const tipo = TIPOS_CATALOGO[pastaTipo.getName().trim()]
+    const tipo = tipoDaPasta(pastaTipo.getName())
     if (!tipo) continue
     const temas = pastaTipo.getFolders()
     while (temas.hasNext()) {
@@ -522,6 +530,61 @@ function arrumarFotosSaoPaulo() {
   }
 }
 
+// ===== PRODUTOS NOVOS DA PASTA "Material para incluir no Site" (rodar pelo editor) =====
+// Move e renomeia os produtos combinados em nov/2026 para o Catálogo. O preço
+// vai no fim do nome ("… - R$ 45,00") e o site mostra separado. Quem já foi
+// movido é pulado; a pasta "(Não Incluir)" nunca é tocada.
+const PRODUTOS_NOVOS = [
+  ['Mockup Canecas 1080x1080px.png', 'Canecas', 'São Paulo', 'Modelo 1.png'],
+  ['Mockup Canecas 1080x1080px (1).png', 'Canecas', 'São Paulo', 'Modelo 2.png'],
+  ['Mockup Canecas 1080x1080px (2).png', 'Canecas', 'São Paulo', 'Modelo 3.png'],
+  ['Mockup Canecas 1080x1080px (3).png', 'Canecas', 'São Paulo', 'Modelo 4.png'],
+  ['Design sem nome (9).png', 'Canecas', 'Modelos', 'Caneca Branca Cerâmica 325 ml - R$ 45,00.png'],
+  ['Design sem nome (8).png', 'Canecas', 'Modelos', 'Caneca Organic Matte Verde Claro - R$ 45,00.png'],
+  ['Design sem nome (7).png', 'Canecas', 'Modelos', 'Caneca Organic Matte Pêssego - R$ 45,00.png'],
+  ['Garrafa de Alumínio Branca 500ml (50,00).jpeg', 'Garrafas', 'Modelos', 'Garrafa de Alumínio Branca 500 ml - R$ 50,00.jpeg'],
+  ['IMÃ ACRÍLICO/CRISTAL - REDONDO (6cm) - 22,00.jpeg', 'Chaveiros e Ímãs', 'Modelos', 'Ímã Acrílico Cristal Redondo 6 cm - R$ 22,00.jpeg'],
+  ['Botton imã 3,5 (5,00).jpeg', 'Chaveiros e Ímãs', 'Modelos', 'Botton Ímã 3,5 cm - R$ 5,00.jpeg'],
+  ['Botton imã 3,5 - (5,00).jpeg', 'Chaveiros e Ímãs', 'Modelos', '_Botton Ímã 3,5 cm (foto 2) - R$ 5,00.jpeg'],
+  ['Botton com clips 3,5 - (9,90).png', 'Chaveiros e Ímãs', 'Modelos', 'Botton com Clips 3,5 cm - R$ 9,90.png'],
+  ['Botton chaveiro duplo 3,5 - (4,50).jpeg', 'Chaveiros e Ímãs', 'Modelos', 'Botton Chaveiro Duplo 3,5 cm - R$ 4,50.jpeg'],
+]
+
+function organizarProdutosNovos() {
+  const material = naoLixeira(pastaBase().getFoldersByName('Material para incluir no Site'))
+  if (!material) throw new Error('Pasta "Material para incluir no Site" não encontrada')
+
+  // todos os arquivos da pasta e subpastas (menos "Não Incluir"), pelo nome
+  const porNome = {}
+  const varrer = (pasta) => {
+    if (/n[ãa]o incluir/i.test(pasta.getName())) return
+    const fs = pasta.getFiles()
+    while (fs.hasNext()) {
+      const f = fs.next()
+      porNome[normalizar(f.getName())] = f
+    }
+    const ps = pasta.getFolders()
+    while (ps.hasNext()) varrer(ps.next())
+  }
+  varrer(material)
+
+  const catalogo = pastaCatalogo()
+  const log = []
+  PRODUTOS_NOVOS.forEach(([origem, tipo, tema, novoNome]) => {
+    const f = porNome[normalizar(origem)]
+    if (!f) {
+      log.push('não encontrado (já movido?): ' + origem)
+      return
+    }
+    const destino = subpasta(subpasta(catalogo, tipo), tema)
+    f.setName(novoNome)
+    f.moveTo(destino)
+    log.push('ok: ' + tipo + ' / ' + tema + ' / ' + novoNome)
+  })
+  console.log(log.join('\n'))
+  mostrarPastas()
+}
+
 // Escreve no registro de execução a árvore da pasta da planilha (pastas e
 // quantos arquivos cada uma tem). Pastas de pedidos "GM-…" só são contadas.
 function mostrarPastas() {
@@ -663,7 +726,9 @@ function salvarImagens(id, pedido) {
 
 function avisar(id, pedido, linkImagens, arquivo) {
   const total = pedido.itens.reduce((s, i) => s + (Number(i.qtd) || 0), 0)
-  const itens = pedido.itens.map((i) => '• ' + i.nome + ' — ' + i.qtd + ' un.').join('\n')
+  const itens = pedido.itens
+    .map((i) => '• ' + i.nome + ' — ' + i.qtd + ' un.' + (i.preco ? ' (' + i.preco + ' cada)' : ''))
+    .join('\n')
   const corpo = [
     'Pedido novo pelo site: ' + id,
     '',

@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils'
 import useCartStore from '@/stores/useCartStore'
 
 // Ilustração de cada tipo de produto, entre o título e a lista
-const SHOWCASE: Record<ProductTypeId, { art: ReactNode; width: string; label: string; caption: string }> = {
+// (tipos sem ilustração, como chaveiros, vão direto para os produtos)
+const SHOWCASE: Partial<Record<ProductTypeId, { art: ReactNode; width: string; label: string; caption: string }>> = {
   pins: {
     art: <BottonArt />,
     width: 'max-w-[340px] md:max-w-[440px]',
@@ -76,15 +77,17 @@ export default function Index() {
           </p>
         </section>
 
-        <section className="-mt-4 mb-16 w-full animate-fade-in md:-mt-8 md:mb-24" key={`art-${type.id}`}>
-          <TiltStage label={showcase.label} className={showcase.width}>
-            {showcase.art}
-          </TiltStage>
-          <p className="mt-6 text-center text-xs leading-relaxed text-gray-500">
-            {onlyCustom ? 'Envie a sua arte' : 'Escolha um dos nossos temas ou envie a sua arte'} —{' '}
-            <span className="text-black">{showcase.caption}</span>
-          </p>
-        </section>
+        {showcase && (
+          <section className="-mt-4 mb-16 w-full animate-fade-in md:-mt-8 md:mb-24" key={`art-${type.id}`}>
+            <TiltStage label={showcase.label} className={showcase.width}>
+              {showcase.art}
+            </TiltStage>
+            <p className="mt-6 text-center text-xs leading-relaxed text-gray-500">
+              {onlyCustom ? 'Envie a sua arte' : 'Escolha um dos nossos temas ou envie a sua arte'} —{' '}
+              <span className="text-black">{showcase.caption}</span>
+            </p>
+          </section>
+        )}
 
         {themes.length > 1 && (
           <div className="-mt-4 mb-12 flex max-w-full gap-2 overflow-x-auto pb-2 [scrollbar-width:none] md:mb-16">
@@ -111,7 +114,9 @@ export default function Index() {
               'grid items-start gap-x-6 gap-y-10 md:gap-x-12 md:gap-y-14',
               onlyCustom
                 ? 'mx-auto max-w-[220px] grid-cols-1'
-                : 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+                : type.id === 'pins'
+                  ? 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+                  : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4', // fotos de produto: cards maiores
             )}
             key={`${type.id}-${themeId}`} // refaz a animação ao trocar de filtro
           >

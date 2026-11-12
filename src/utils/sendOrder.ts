@@ -63,6 +63,7 @@ export async function sendOrderToSheet({
     imagensNaoEnviadas,
     itens: itens.map((i) => ({
       nome: i.name,
+      preco: i.price ?? '',
       tipo: getProductType(i.type).label,
       tema: getTheme(i.theme)?.name ?? '',
       qtd: i.qty,

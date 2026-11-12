@@ -8,7 +8,7 @@
 // =====================================================
 
 import type { LucideIcon } from 'lucide-react'
-import { CircleDot, Coffee, Milk } from 'lucide-react'
+import { CircleDot, Coffee, KeyRound, Milk } from 'lucide-react'
 import config from './config.json'
 
 export const WHATSAPP_NUMBER = '554195079982' // DDI + DDD + número, sem espaços
@@ -23,7 +23,7 @@ export const PLANILHA_ENDPOINT: string = config.planilhaEndpoint
 // texto do pedido por e-mail para a loja.
 export const FORMSPREE_ENDPOINT = 'https://formspree.io/f/myezyqgn'
 
-export type ProductTypeId = 'pins' | 'canecas' | 'garrafas'
+export type ProductTypeId = 'pins' | 'canecas' | 'garrafas' | 'chaveiros'
 
 export type ProductType = {
   id: ProductTypeId
@@ -45,6 +45,7 @@ export type Product = {
   theme: string | null // null = item personalizado, aparece em todos os temas
   image: string | null
   custom?: boolean // cliente envia a arte dele no pedido
+  price?: string // ex: "R$ 45,00" — só nos produtos com preço definido
 }
 
 export const PRODUCT_TYPES: ProductType[] = [
@@ -69,7 +70,17 @@ export const PRODUCT_TYPES: ProductType[] = [
     subtitle: 'personalizadas com a sua arte',
     icon: Milk,
   },
+  {
+    id: 'chaveiros',
+    label: 'Chaveiros',
+    title: 'chaveiros & ímãs',
+    subtitle: 'bottons-ímã, chaveiros, clips e ímãs com a sua arte',
+    icon: KeyRound,
+  },
 ]
+
+// Bottons aparecem em círculo; os outros produtos, em quadrado
+export const isRound = (p: Pick<Product, 'type'>) => p.type === 'pins'
 
 // ----- catálogo do Google Drive (gerado na publicação; pode não existir) -----
 type GeneratedProduct = Omit<Product, 'theme'> & { theme: string; themeName: string }
@@ -120,6 +131,7 @@ export const PRODUCTS: Product[] = [
   customItem('pins', 'Pin personalizado'),
   customItem('canecas', 'Caneca personalizada'),
   customItem('garrafas', 'Garrafa personalizada'),
+  customItem('chaveiros', 'Chaveiro ou ímã personalizado'),
   ...catalogProducts,
 ]
 

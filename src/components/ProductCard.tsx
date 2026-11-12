@@ -1,4 +1,4 @@
-import { Product } from '@/lib/catalog'
+import { Product, isRound } from '@/lib/catalog'
 import { cn } from '@/lib/utils'
 import { ProductImage } from './ProductImage'
 
@@ -11,6 +11,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product, qty, onClick, index }: ProductCardProps) {
   const selected = qty > 0
+  const redondo = isRound(product)
 
   return (
     <button
@@ -23,14 +24,15 @@ export function ProductCard({ product, qty, onClick, index }: ProductCardProps) 
     >
       <div
         className={cn(
-          'relative aspect-square w-full shrink-0 rounded-full transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105',
+          'relative aspect-square w-full shrink-0 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105',
           'shadow-lg group-hover:shadow-float group-focus-visible:ring-2 group-focus-visible:ring-black group-focus-visible:ring-offset-4',
+          redondo ? 'rounded-full' : 'rounded-2xl',
           selected && 'ring-[3px] ring-brand-coral ring-offset-4',
         )}
       >
         <ProductImage product={product} className="h-full w-full" />
         {/* brilho do botton */}
-        {!product.custom && (
+        {redondo && !product.custom && (
           <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.45),transparent_45%)] shadow-[inset_0_-6px_14px_rgba(0,0,0,0.18)]" />
         )}
 
@@ -49,6 +51,9 @@ export function ProductCard({ product, qty, onClick, index }: ProductCardProps) 
       >
         {product.name}
       </span>
+      {product.price && (
+        <span className="-mt-2 text-xs font-semibold text-black">{product.price}</span>
+      )}
     </button>
   )
 }

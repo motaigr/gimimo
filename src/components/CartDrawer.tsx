@@ -66,7 +66,10 @@ export function CartDrawer() {
                     iconClassName="h-5 w-5"
                   />
                   <div className="flex-1 space-y-2">
-                    <h4 className="text-sm font-medium leading-tight">{item.name}</h4>
+                    <h4 className="text-sm font-medium leading-tight">
+                      {item.name}
+                      {item.price && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{item.price} cada</span>}
+                    </h4>
                     <div className="flex items-center gap-2">
                       <QtyControl
                         value={item.qty}

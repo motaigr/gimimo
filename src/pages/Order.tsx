@@ -61,7 +61,7 @@ export default function Order() {
       : ''
 
   const buildMessage = (cliente: string) => {
-    const linhas = cart.map((i) => `• ${i.name} — ${i.qty} un.`).join('\n')
+    const linhas = cart.map((i) => `• ${i.name} — ${i.qty} un.${i.price ? ` (${i.price} cada)` : ''}`).join('\n')
     const contato = [
       tel && `Telefone/WhatsApp: ${tel}`,
       entregaTexto && `Entrega: ${entregaTexto}`,
@@ -220,7 +220,10 @@ export default function Order() {
             {cart.map((item) => (
               <div key={item.id} className="flex items-center gap-4 py-4">
                 <ProductImage product={item} className="h-14 w-14 shrink-0 shadow-md" iconClassName="h-5 w-5" />
-                <span className="flex-1 text-sm font-medium">{item.name}</span>
+                <span className="flex-1 text-sm font-medium">
+                  {item.name}
+                  {item.price && <span className="block text-xs font-normal text-gray-500">{item.price} cada</span>}
+                </span>
                 <QtyControl value={item.qty} onChange={(q) => setQty(item.id, q)} label={item.name} />
                 <button
                   type="button"

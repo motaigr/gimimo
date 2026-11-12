@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Product, getProductType, getTheme } from '@/lib/catalog'
+import { Product, getProductType, getTheme, isRound } from '@/lib/catalog'
+import { cn } from '@/lib/utils'
 import useCartStore from '@/stores/useCartStore'
 import { ShoppingBag } from 'lucide-react'
 import { ProductImage } from './ProductImage'
@@ -32,6 +33,7 @@ export function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps
   }
 
   const label = getTheme(product.theme)?.name ?? getProductType(product.type).label
+  const redondo = isRound(product)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -39,11 +41,14 @@ export function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps
         <DialogTitle className="sr-only">{product.name}</DialogTitle>
         <DialogDescription className="sr-only">Escolha a quantidade de {product.name}</DialogDescription>
 
-        <div className="flex w-full items-center justify-center bg-cream p-10 sm:p-12">
+        <div className={cn('flex w-full items-center justify-center bg-cream', redondo ? 'p-10 sm:p-12' : 'p-6')}>
           <ProductImage
             product={product}
             eager
-            className="aspect-square w-full max-w-[280px] shadow-2xl animate-fade-in"
+            className={cn(
+              'aspect-square w-full animate-fade-in',
+              redondo ? 'max-w-[280px] shadow-2xl' : 'max-w-[380px] shadow-lg',
+            )}
           />
         </div>
 
@@ -53,6 +58,7 @@ export function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps
               {label}
             </span>
             <h2 className="font-serif text-3xl font-normal tracking-wide">{product.name}</h2>
+            {product.price && <p className="text-lg font-semibold">{product.price} <span className="text-xs font-normal text-muted-foreground">cada</span></p>}
             {product.custom && (
               <p className="text-sm text-muted-foreground">
                 Você envia a sua arte ou imagens de referência ao finalizar o pedido.

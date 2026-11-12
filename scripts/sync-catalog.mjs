@@ -49,16 +49,20 @@ async function main() {
   const cmp = (a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
   itens.sort((a, b) => cmp(a.tipo, b.tipo) || cmp(a.tema, b.tema) || cmp(a.nome, b.nome))
 
-  // id estável por tipo + tema + nome (o carrinho salvo usa esse id)
+  // id estável por tipo + tema + nome (o carrinho salvo usa esse id).
+  // Preço opcional no fim do nome do arquivo: "Caneca Branca - R$ 45,00".
   const usados = new Set()
   const produtos = itens.map((i) => {
+    const m = i.nome.match(/^(.*?)\s*[-–—]?\s*\(?R\$\s*([\d.]+(?:,\d{1,2})?)\)?\s*$/i)
+    const nome = m ? m[1].trim() : i.nome
+    const preco = m ? `R$ ${m[2]}` : undefined
     const base = `${i.tipo}-${slug(i.tema)}-`
-    let nomeSlug = slug(i.nome)
-    for (let n = 2; usados.has(base + nomeSlug); n++) nomeSlug = `${slug(i.nome)}-${n}`
+    let nomeSlug = slug(nome)
+    for (let n = 2; usados.has(base + nomeSlug); n++) nomeSlug = `${slug(nome)}-${n}`
     const id = base + nomeSlug
     usados.add(id)
     const arquivo = `${i.tipo}/${slug(i.tema)}/${nomeSlug}.webp`
-    return { driveId: i.id, id, name: i.nome, type: i.tipo, theme: slug(i.tema), themeName: i.tema, arquivo }
+    return { driveId: i.id, id, name: nome, price: preco, type: i.tipo, theme: slug(i.tema), themeName: i.tema, arquivo }
   })
 
   await fs.rm(OUT_DIR, { recursive: true, force: true })
@@ -75,11 +79,12 @@ async function main() {
         if (!img) throw new Error('não entregue pelo Apps Script')
         const destino = path.join(OUT_DIR, p.arquivo)
         await fs.mkdir(path.dirname(destino), { recursive: true })
-        await sharp(Buffer.from(img.conteudo, 'base64'))
-          .rotate() // respeita a orientação de fotos de celular
-          .resize(400, 400, { fit: 'cover' })
-          .webp({ quality: 82 })
-          .toFile(destino)
+        // bottons: recorte quadrado (vira círculo no site); outros produtos:
+        // foto inteira num quadrado creme, sem cortar o produto nem textos
+        const foto = sharp(Buffer.from(img.conteudo, 'base64')).rotate() // orientação de fotos de celular
+        if (p.type === 'pins') foto.resize(400, 400, { fit: 'cover' })
+        else foto.flatten({ background: '#F7F4EF' }).resize(600, 600, { fit: 'contain', background: '#F7F4EF' })
+        await foto.webp({ quality: 82 }).toFile(destino)
         p.ok = true
       } catch (err) {
         falhas.push(`${p.themeName}/${p.name}: ${err.message}`)
@@ -100,9 +105,10 @@ async function main() {
 
   const saida = produtos
     .filter((p) => p.ok)
-    .map(({ id, name, type, theme, themeName, arquivo }) => ({
+    .map(({ id, name, price, type, theme, themeName, arquivo }) => ({
       id,
       name,
+      ...(price ? { price } : {}),
       type,
       theme,
       themeName,
