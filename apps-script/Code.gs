@@ -46,6 +46,13 @@ const STATUS = ['novo', 'orçamento enviado', 'aprovado', 'em produção', 'pron
 // com a coluna Qtd vazia. Os arquivos ficam em Pedidos / ano-mês.
 const ABA_MODELO = 'Planilha1'
 
+// Aba com os produtos que não são bottons (canecas, garrafas, chaveiros…),
+// refeita sozinha a partir do catálogo a cada "Publicar site". No pedido, esses
+// produtos vão para uma aba própria, com valor unitário, subtotal e total em R$.
+const ABA_OUTROS = 'Outros produtos'
+const SITE_URL = 'https://www.gimimo.com.br' // fotos dos produtos na planilha
+const NOMES_TIPOS = { pins: 'Bottons', canecas: 'Canecas', garrafas: 'Garrafas', chaveiros: 'Chaveiros e Ímãs' }
+
 const COLUNAS = [
   'Data',
   'Pedido',
@@ -135,15 +142,31 @@ function criarArquivoPedido(id, pedido, linkImagens, agora) {
   const pasta = subpasta(pastaPorNome(PASTA_PEDIDOS), Utilities.formatDate(agora, tz, 'yyyy-MM'))
   const nome = nomeLivre(pasta, Utilities.formatDate(agora, tz, 'dd.MM') + ' ' + ss.getName())
 
-  // copia só a aba (copiar o arquivo inteiro levaria junto o script e o menu)
+  // bottons vão para a cópia da aba modelo; o resto, para a cópia da aba
+  // "Outros produtos" (se ela não existir, tudo vai no modelo, como antes)
+  const modeloOutros = ss.getSheetByName(ABA_OUTROS)
+  const ehBotton = (i) => ['PINS', 'BOTTONS'].indexOf(normalizar(i.tipo)) !== -1
+  const outros = modeloOutros ? pedido.itens.filter((i) => !ehBotton(i)) : []
+  const bottons = modeloOutros ? pedido.itens.filter(ehBotton) : pedido.itens
+
+  // copia só as abas (copiar o arquivo inteiro levaria junto o script e o menu)
   const novo = SpreadsheetApp.create(nome)
-  const aba = modelo.copyTo(novo).setName('Pedido')
+  const abas = []
+  if (bottons.length || !outros.length) {
+    const aba = modelo.copyTo(novo).setName('Bottons')
+    preencherModelo(aba, Object.assign({}, pedido, { itens: bottons }), linkImagens)
+    abas.push(aba)
+  }
+  if (outros.length) {
+    const aba = modeloOutros.copyTo(novo).setName(ABA_OUTROS)
+    preencherOutros(aba, outros, linkImagens)
+    abas.push(aba)
+  }
   novo.getSheets().forEach((s) => {
-    if (s.getSheetId() !== aba.getSheetId()) novo.deleteSheet(s)
+    if (abas.every((a) => a.getSheetId() !== s.getSheetId())) novo.deleteSheet(s)
   })
 
-  preencherModelo(aba, pedido, linkImagens)
-  blocoCliente(aba, id, pedido, linkImagens, agora, tz)
+  abas.forEach((aba) => blocoCliente(aba, id, pedido, linkImagens, agora, tz))
   SpreadsheetApp.flush()
   DriveApp.getFileById(novo.getId()).moveTo(pasta)
   return novo.getUrl()
@@ -221,6 +244,197 @@ function preencherModelo(aba, pedido, linkImagens) {
     const letra = aba.getRange(1, colQtd + 1).getA1Notation().replace(/\d+/g, '')
     aba.getRange(linhaTotal, colQtd + 1).setFormula('=SUM(' + letra + '2:' + letra + (linhaTotal - 1) + ')')
   }
+}
+
+// ===== ABA "Outros produtos" =====
+// Colunas: (A vazia) | IMAGEM | PRODUTO | TIPO | Valor unit. | Qtd | Subtotal
+const COLS_OUTROS = ['', 'IMAGEM', 'PRODUTO', 'TIPO', 'Valor unit.', 'Qtd', 'Subtotal']
+const LINHAS_LIVRES = 6 // linhas vazias antes do TOTAL (personalizados etc.)
+
+// Mesmo slug do site (scripts/sync-catalog.mjs), para achar a foto publicada
+function slugSite(s) {
+  return (
+    String(s)
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'item'
+  )
+}
+
+// "Caneca X - R$ 35,00" → { nome: 'Caneca X', preco: 35 }
+function precoDoNome(nome) {
+  const m = String(nome).match(/^(.*?)\s*[-–—]?\s*\(?R\$\s*([\d.]+(?:,\d{1,2})?)\)?\s*$/i)
+  if (!m) return { nome: String(nome).trim(), preco: null }
+  return { nome: m[1].trim(), preco: Number(m[2].replace(/\./g, '').replace(',', '.')) }
+}
+
+function precoTexto(v) {
+  const m = String(v || '').match(/([\d.]+(?:,\d{1,2})?)/)
+  return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) : ''
+}
+
+// Produtos do catálogo que não são bottons, na mesma ordem e com as mesmas
+// URLs de foto que o site gera
+function produtosOutros() {
+  const cmp = (a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
+  const itens = lerCatalogo().sort((a, b) => cmp(a.tipo, b.tipo) || cmp(a.tema, b.tema) || cmp(a.nome, b.nome))
+  const usados = {}
+  const lista = []
+  itens.forEach((i) => {
+    const p = precoDoNome(i.nome)
+    const base = i.tipo + '-' + slugSite(i.tema) + '-'
+    let nomeSlug = slugSite(p.nome)
+    for (let n = 2; usados[base + nomeSlug]; n++) nomeSlug = slugSite(p.nome) + '-' + n
+    usados[base + nomeSlug] = true
+    if (i.tipo === 'pins') return
+    lista.push({
+      nome: p.nome,
+      preco: p.preco,
+      tipo: NOMES_TIPOS[i.tipo] || i.tipo,
+      tema: i.tema,
+      foto: SITE_URL + '/catalogo/' + i.tipo + '/' + slugSite(i.tema) + '/' + nomeSlug + '.webp',
+    })
+  })
+  return lista
+}
+
+// Refaz a aba "Outros produtos" com os produtos atuais do catálogo
+function atualizarAbaOutros() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
+  const aba = ss.getSheetByName(ABA_OUTROS) || ss.insertSheet(ABA_OUTROS)
+  aba.clear()
+  const lista = produtosOutros()
+
+  aba.getRange(1, 1, 1, COLS_OUTROS.length).setValues([COLS_OUTROS])
+  const linhas = lista.map((p, k) => {
+    const r = k + 2
+    return ['', '=IMAGE("' + p.foto + '")', p.nome, p.tipo, p.preco === null ? '' : p.preco, '', '=IF(F' + r + '="","",IF(E' + r + '="","",E' + r + '*F' + r + '))']
+  })
+  for (let k = 0; k < LINHAS_LIVRES; k++) {
+    const r = lista.length + 2 + k
+    linhas.push(['', '', '', '', '', '', '=IF(F' + r + '="","",IF(E' + r + '="","",E' + r + '*F' + r + '))'])
+  }
+  aba.getRange(2, 1, linhas.length, COLS_OUTROS.length).setValues(linhas)
+
+  const totalRow = linhas.length + 2
+  aba.getRange(totalRow, 2).setValue('TOTAL')
+  aba.getRange(totalRow, 6).setFormula('=SUM(F2:F' + (totalRow - 1) + ')')
+  aba.getRange(totalRow, 7).setFormula('=SUM(G2:G' + (totalRow - 1) + ')')
+  formatarAbaOutros(aba, totalRow)
+  return lista.length
+}
+
+function formatarAbaOutros(aba, totalRow) {
+  const larguras = [20, 110, 300, 130, 100, 80, 110]
+  larguras.forEach((w, i) => aba.setColumnWidth(i + 1, w))
+  aba.getRange(1, 2, 1, 6).setFontWeight('bold').setBackground('#808080').setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle')
+  aba.setRowHeight(1, 40)
+  if (totalRow > 2) {
+    aba.setRowHeights(2, totalRow - 2, 90)
+    const corpo = aba.getRange(2, 2, totalRow - 2, 6)
+    corpo.setVerticalAlignment('middle').setBorder(true, true, true, true, true, true)
+    aba.getRange(2, 3, totalRow - 2, 1).setFontWeight('bold').setWrap(true)
+    aba.getRange(2, 4, totalRow - 2, 4).setHorizontalAlignment('center')
+  }
+  aba.getRange(2, 5, totalRow - 1, 1).setNumberFormat('"R$" #,##0.00')
+  aba.getRange(2, 7, totalRow - 1, 1).setNumberFormat('"R$" #,##0.00')
+  aba.getRange(totalRow, 2, 1, 6).setFontWeight('bold').setBorder(true, true, true, true, true, true)
+  aba.setFrozenRows(1)
+}
+
+// Preenche a cópia da aba "Outros produtos" no arquivo do pedido
+function preencherOutros(aba, itens, linkImagens) {
+  const dados = aba.getDataRange().getValues()
+  const cab = dados[0].map(normalizar)
+  const col = (nome) => cab.indexOf(normalizar(nome))
+  const cNome = col('PRODUTO')
+  const cQtd = col('Qtd')
+  const cImg = col('IMAGEM')
+  const cPreco = col('Valor unit.')
+  const cTipo = col('TIPO')
+  let fim = dados.findIndex((r, i) => i > 0 && r.some((v) => normalizar(v) === 'TOTAL'))
+  if (fim < 0) fim = dados.length
+
+  const linhaDe = {}
+  for (let i = 1; i < fim; i++) {
+    const n = normalizar(dados[i][cNome])
+    if (n && linhaDe[n] === undefined) linhaDe[n] = i
+  }
+
+  const qtd = []
+  for (let i = 1; i < fim; i++) qtd.push([''])
+  const extras = []
+  itens.forEach((item) => {
+    const i = linhaDe[normalizar(item.nome)]
+    if (i === undefined) extras.push(item)
+    else qtd[i - 1][0] = (Number(qtd[i - 1][0]) || 0) + (Number(item.qtd) || 0)
+  })
+  if (qtd.length) aba.getRange(2, cQtd + 1, qtd.length, 1).setValues(qtd)
+
+  if (extras.length) {
+    let ultimo = 0
+    for (let i = 1; i < fim; i++) if (normalizar(dados[i][cNome])) ultimo = i
+    const livres = []
+    for (let i = ultimo + 1; i < fim; i++) if (!normalizar(dados[i][cNome])) livres.push(i + 1)
+    const faltam = extras.length - livres.length
+    if (faltam > 0) {
+      const antes = livres.length ? livres[livres.length - 1] : fim + 1
+      aba.insertRowsBefore(antes, faltam)
+      for (let k = 0; k < faltam; k++) livres.push(livres.length ? livres[livres.length - 1] + 1 : antes + k)
+      livres.sort((a, b) => a - b)
+    }
+    const altura = aba.getRowHeight(2)
+    extras.forEach((item, k) => {
+      const r = livres[k]
+      aba.getRange(r, cNome + 1).setValue(texto(item.nome))
+      aba.getRange(r, cTipo + 1).setValue(texto(item.tipo))
+      aba.getRange(r, cQtd + 1).setValue(Number(item.qtd) || 0)
+      if (item.preco) aba.getRange(r, cPreco + 1).setValue(precoTexto(item.preco))
+      const L = (c) => aba.getRange(1, c + 1).getA1Notation().replace(/\d+/g, '')
+      aba.getRange(r, cQtd + 2).setFormula('=IF(' + L(cQtd) + r + '="","",IF(' + L(cPreco) + r + '="","",' + L(cPreco) + r + '*' + L(cQtd) + r + '))')
+      const celula = aba.getRange(r, cImg + 1)
+      if (item.personalizado && linkImagens) celula.setFormula('=HYPERLINK("' + linkImagens + '","ver imagens do cliente")')
+      else if (item.personalizado) celula.setValue('imagens: pedir ao cliente')
+      else if (formulaImagem(item.imagem)) celula.setFormula(formulaImagem(item.imagem))
+      aba.setRowHeight(r, altura)
+    })
+  }
+
+  // totais (quantidade e R$) somando tudo, inclusive linhas novas
+  const total = aba.createTextFinder('TOTAL').matchEntireCell(true).findNext()
+  if (total) {
+    const t = total.getRow()
+    const L = (c) => aba.getRange(1, c + 1).getA1Notation().replace(/\d+/g, '')
+    aba.getRange(t, cQtd + 1).setFormula('=SUM(' + L(cQtd) + '2:' + L(cQtd) + (t - 1) + ')')
+    aba.getRange(t, cQtd + 2).setFormula('=SUM(' + L(cQtd + 1) + '2:' + L(cQtd + 1) + (t - 1) + ')')
+  }
+}
+
+// ===== RENOMEAR CANECAS (nov/2026, rodar pelo editor) =====
+// Dá nomes diferentes às canecas de mesma descrição, para o cliente e a loja
+// saberem qual arte foi pedida. Mantém a extensão do arquivo.
+const NOMES_CANECAS = {
+  '1GfQwpzTly07l5E6B0z05lQbCFYgUBLiN': 'Caneca Branca 325 ml – Monumentos de SP - R$ 35,00',
+  '1smIkjrdFi48NKZkXelUDpurqkZbY00hw': 'Caneca Branca 325 ml – Silhuetas Coloridas - R$ 35,00',
+  '17bcXWET1n-_KBd_eUf8VYWjVsG1wHIQW': 'Caneca Branca 325 ml – Skyline Aquarela - R$ 35,00',
+  '16LM08t2Z00FJ4pAQVd2iIjNsH2cNBqkf': 'Caneca Branca 325 ml – Pôr do Sol - R$ 35,00',
+  '1pMlifiI2QACWHBvx7kyKCP6O_Hb0_Hn6': 'Caneca Branca 325 ml – Eu ♥ SP - R$ 45,00',
+}
+
+function renomearCanecas() {
+  const log = []
+  Object.keys(NOMES_CANECAS).forEach((id) => {
+    const f = DriveApp.getFileById(id)
+    const ext = (f.getName().match(/\.[a-z0-9]+$/i) || [''])[0]
+    const antes = f.getName()
+    f.setName(NOMES_CANECAS[id] + ext)
+    log.push(antes + '  →  ' + f.getName())
+  })
+  console.log(log.join('\n'))
+  console.log('Aba "' + ABA_OUTROS + '" atualizada com ' + atualizarAbaOutros() + ' produtos.')
 }
 
 // Dados do cliente ao lado da tabela
@@ -379,6 +593,7 @@ function onOpen() {
     .createMenu('Gimimo')
     .addItem('Publicar site (atualizar catálogo)', 'publicarSite')
     .addItem('Abrir pasta do catálogo', 'abrirCatalogo')
+    .addItem('Atualizar aba "Outros produtos"', 'atualizarAbaOutros')
     .addSeparator()
     .addItem('Configurar publicação…', 'configurarPublicacao')
     .addToUi()
@@ -394,6 +609,7 @@ function publicarSite() {
   const itens = lerCatalogo()
   const temas = {}
   itens.forEach((i) => (temas[i.tipo + '/' + i.tema] = true))
+  atualizarAbaOutros() // mantém a aba "Outros produtos" igual ao catálogo
   const resposta = UrlFetchApp.fetch(hook, { method: 'post', muteHttpExceptions: true })
   if (resposta.getResponseCode() >= 300) {
     ui.alert('Não foi possível publicar (erro ' + resposta.getResponseCode() + '). Tente de novo em instantes.')
