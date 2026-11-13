@@ -11,7 +11,7 @@ import type { LucideIcon } from 'lucide-react'
 import { CircleDot, Coffee, KeyRound, Milk } from 'lucide-react'
 import config from './config.json'
 
-export const WHATSAPP_NUMBER = '554195079982' // DDI + DDD + número, sem espaços
+export const WHATSAPP_NUMBER = '5541995079982' // DDI + DDD + número, sem espaços
 export const EMAIL_LOJA = 'gimimoandco@gmail.com'
 
 // URL do Google Apps Script (planilha de pedidos + catálogo do Drive).

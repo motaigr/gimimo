@@ -277,27 +277,85 @@ function precoTexto(v) {
 
 // Produtos do catálogo que não são bottons, na mesma ordem e com as mesmas
 // URLs de foto que o site gera
-function produtosOutros() {
+// Catálogo com o endereço da foto publicada no site (mesma ordem e slugs do
+// scripts/sync-catalog.mjs)
+function catalogoComFotos() {
   const cmp = (a, b) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' })
   const itens = lerCatalogo().sort((a, b) => cmp(a.tipo, b.tipo) || cmp(a.tema, b.tema) || cmp(a.nome, b.nome))
   const usados = {}
-  const lista = []
-  itens.forEach((i) => {
+  return itens.map((i) => {
     const p = precoDoNome(i.nome)
     const base = i.tipo + '-' + slugSite(i.tema) + '-'
     let nomeSlug = slugSite(p.nome)
     for (let n = 2; usados[base + nomeSlug]; n++) nomeSlug = slugSite(p.nome) + '-' + n
     usados[base + nomeSlug] = true
-    if (i.tipo === 'pins') return
-    lista.push({
+    return {
+      tipoId: i.tipo,
       nome: p.nome,
       preco: p.preco,
       tipo: NOMES_TIPOS[i.tipo] || i.tipo,
       tema: i.tema,
       foto: SITE_URL + '/catalogo/' + i.tipo + '/' + slugSite(i.tema) + '/' + nomeSlug + '.webp',
-    })
+    }
   })
-  return lista
+}
+
+function produtosOutros() {
+  return catalogoComFotos().filter((p) => p.tipoId !== 'pins')
+}
+
+// Coloca na aba modelo de bottons (Planilha1) os bottons do catálogo que
+// ainda não têm linha, com a foto do site. Não mexe nas linhas que já existem.
+function completarAbaBottons() {
+  const aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ABA_MODELO)
+  if (!aba) throw new Error('Aba modelo "' + ABA_MODELO + '" não encontrada')
+  const dados = aba.getDataRange().getValues()
+  const cab = dados[0].map(normalizar)
+  const colNome = cab.findIndex((c) => c.indexOf('TEMA') !== -1 || c.indexOf('PRODUTO') !== -1)
+  const colQtd = cab.findIndex((c) => c.indexOf('QTD') !== -1 || c.indexOf('QUANT') !== -1)
+  const colImg = cab.findIndex((c) => c.indexOf('IMAGE') !== -1 || c.indexOf('FOTO') !== -1)
+  if (colNome < 0) throw new Error('A aba modelo precisa da coluna "TEMA" na linha 1')
+
+  let fim = dados.findIndex((r, i) => i > 0 && r.some((v) => normalizar(v) === 'TOTAL'))
+  if (fim < 0) fim = dados.length
+  const existentes = {}
+  let ultimo = 1 // índice (0) da última linha com modelo
+  for (let i = 1; i < fim; i++) {
+    const n = normalizar(dados[i][colNome])
+    if (n) {
+      existentes[n] = true
+      ultimo = i
+    }
+  }
+
+  const faltam = catalogoComFotos().filter((p) => p.tipoId === 'pins' && !existentes[normalizar(p.nome)])
+  if (!faltam.length) {
+    console.log('Aba "' + ABA_MODELO + '": nenhum botton novo.')
+    return 0
+  }
+
+  const linhaUltimo = ultimo + 1 // número da linha na planilha
+  aba.insertRowsAfter(linhaUltimo, faltam.length)
+  const largura = aba.getLastColumn()
+  const altura = aba.getRowHeight(linhaUltimo)
+  aba.getRange(linhaUltimo, 1, 1, largura)
+    .copyTo(aba.getRange(linhaUltimo + 1, 1, faltam.length, largura), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false)
+  aba.setRowHeights(linhaUltimo + 1, faltam.length, altura)
+  faltam.forEach((p, k) => {
+    const r = linhaUltimo + 1 + k
+    aba.getRange(r, colNome + 1).setValue(texto(p.nome.toUpperCase()))
+    if (colImg >= 0 && formulaImagem(p.foto)) aba.getRange(r, colImg + 1).setFormula(formulaImagem(p.foto))
+  })
+
+  // TOTAL da aba modelo soma todas as linhas
+  const total = aba.createTextFinder('TOTAL').matchEntireCell(true).findNext()
+  if (total && colQtd >= 0) {
+    const linhaTotal = total.getRow()
+    const letra = aba.getRange(1, colQtd + 1).getA1Notation().replace(/\d+/g, '')
+    aba.getRange(linhaTotal, colQtd + 1).setFormula('=SUM(' + letra + '2:' + letra + (linhaTotal - 1) + ')')
+  }
+  console.log('Aba "' + ABA_MODELO + '": ' + faltam.length + ' bottons novos (' + faltam[0].nome + ' … ' + faltam[faltam.length - 1].nome + ').')
+  return faltam.length
 }
 
 // Refaz a aba "Outros produtos" com os produtos atuais do catálogo
@@ -594,6 +652,7 @@ function onOpen() {
     .addItem('Publicar site (atualizar catálogo)', 'publicarSite')
     .addItem('Abrir pasta do catálogo', 'abrirCatalogo')
     .addItem('Atualizar aba "Outros produtos"', 'atualizarAbaOutros')
+    .addItem('Completar aba de bottons (Planilha1)', 'completarAbaBottons')
     .addSeparator()
     .addItem('Configurar publicação…', 'configurarPublicacao')
     .addToUi()
@@ -609,6 +668,7 @@ function publicarSite() {
   const itens = lerCatalogo()
   const temas = {}
   itens.forEach((i) => (temas[i.tipo + '/' + i.tema] = true))
+  completarAbaBottons() // bottons novos ganham linha na aba modelo
   atualizarAbaOutros() // mantém a aba "Outros produtos" igual ao catálogo
   const resposta = UrlFetchApp.fetch(hook, { method: 'post', muteHttpExceptions: true })
   if (resposta.getResponseCode() >= 300) {
